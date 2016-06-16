@@ -45,6 +45,9 @@ func (this *WsSocket) HandShake() error {
 	if string(content[0:3]) == "GET" {
 		headers := parseHandshake(string(content))
 		secWebsocketKey := headers["Sec-WebSocket-Key"]
+		if secWebsocketKey == "" {
+			return errors.New("invalid Sec-WebSocket-Key")
+		}
 		guid := "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 		h := sha1.New()
 
@@ -61,6 +64,8 @@ func (this *WsSocket) HandShake() error {
 			log.Println("write response failed!err:=%v", err)
 			return err
 		}
+	} else {
+		return errors.New("unsupported request!")
 	}
 	return nil
 }
@@ -151,7 +156,7 @@ func (this *WsSocket) ReadIframe() (data []byte, err error) {
 	RSV2 := opcodeByte[0] >> 5 & 1
 	RSV3 := opcodeByte[0] >> 4 & 1
 	OPCODE := opcodeByte[0] & 15
-	log.Println(RSV1, RSV2, RSV3, OPCODE)
+	log.Println(FIN, RSV1, RSV2, RSV3, OPCODE)
 	if int(OPCODE) == 8 {
 		err = errors.New("connection closed")
 		return
@@ -168,7 +173,7 @@ func (this *WsSocket) ReadIframe() (data []byte, err error) {
 	mask := payloadLenByte[0] >> 7
 	if payloadLen == 126 {
 		extendedByte := make([]byte, 2)
-		this.Conn.Read(extendedByte)
+		_, err = this.Conn.Read(extendedByte)
 		if err != nil {
 			return
 		}
@@ -177,7 +182,7 @@ func (this *WsSocket) ReadIframe() (data []byte, err error) {
 		(*lc)[0] = extendedByte[1]
 	} else if payloadLen == 127 {
 		extendedByte := make([]byte, 8)
-		this.Conn.Read(extendedByte)
+		_, err = this.Conn.Read(extendedByte)
 		if err != nil {
 			return
 		}
@@ -194,14 +199,14 @@ func (this *WsSocket) ReadIframe() (data []byte, err error) {
 
 	maskingByte := make([]byte, 4)
 	if mask == 1 {
-		this.Conn.Read(maskingByte)
+		_, err = this.Conn.Read(maskingByte)
 		if err != nil {
 			return
 		}
 		this.MaskingKey = maskingByte
 	}
 	payloadDataByte := make([]byte, payloadLen)
-	this.Conn.Read(payloadDataByte)
+	_, err = this.Conn.Read(payloadDataByte)
 	if err != nil {
 		return
 	}
@@ -215,7 +220,6 @@ func (this *WsSocket) ReadIframe() (data []byte, err error) {
 	}
 	if FIN == 1 {
 		data = dataByte
-		err = this.SendIframe(data, 1)
 		return
 	}
 

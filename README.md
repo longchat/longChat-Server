@@ -1,7 +1,7 @@
 # longChat
 基于websocket的聊天系统
 
-###features
-1.支持websocket
+##Features
+1.client与messageserver通讯使用websocket（支持tls）
 
-2.支持tls
+2.支持负载均衡
