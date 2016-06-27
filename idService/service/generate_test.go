@@ -1,4 +1,4 @@
-package generator
+package service
 
 import (
 	"math/rand"

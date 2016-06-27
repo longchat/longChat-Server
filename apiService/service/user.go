@@ -1,9 +1,10 @@
-package main
+package service
 
 import (
 	"fmt"
-	"longChat-Server/idGenerator/generator"
-	"longChat-Server/storage"
+	idService "longChat-Server/idService/service"
+
+	"longChat-Server/storageService/storageService"
 )
 
 func main() {
@@ -15,5 +16,10 @@ func main() {
 }
 
 func createUser() {
-	storage.CreateUser(generator.Generate(generator.UserTypeId), "longxia", "longxia110", 1)
+	id, _ := idService.Generate(idService.GenerateReq_User)
+	storage.CreateUser(id, "longxia", "longxia110", "127.0.0.1")
+}
+
+func CreateUser() (int64, error) {
+	return idService.Generate(idService.GenerateReq_User)
 }
