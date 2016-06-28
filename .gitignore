@@ -1,4 +1,8 @@
 *~
-ssl
 ssl/
-longChat
+apiService
+idService
+msgService
+storageService
+longChat-Server
+logs

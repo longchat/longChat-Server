@@ -5,7 +5,14 @@ import (
 )
 
 const (
-	IdServiceAddress = "service.id.address"
+	IdServiceAddress  = "service.id.address"
+	IdServiceStartIdx = "service.id.startidx"
+	IdServiceStep     = "service.id.step"
+
+	StorageServiceDbName = "service.storage.db.name"
+	StorageServiceDbAddr = "service.storage.db.addr"
+	StorageServiceDbUser = "service.storage.db.user"
+	StorageServiceDbPsw  = "service.storage.db.psw"
 )
 
 func ErrGetConfigFailed(configName string, err error) string {

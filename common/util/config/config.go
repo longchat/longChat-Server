@@ -1,13 +1,13 @@
 package config
 
 import (
+	"flag"
 	slog "log"
 	"strconv"
 	"strings"
 
 	conf "github.com/robfig/config"
 )
-
 
 var defaultConfig *conf.Config
 var env map[string]string
@@ -57,7 +57,7 @@ func GetConfigFloat(key string) (v float64, err error) {
 	return
 }
 
-func LoadConfigFile() error {
+func loadConfigFile() error {
 	configpath, _ := env["config"]
 	c, err := conf.ReadDefault(configpath)
 	if err != nil {
@@ -67,9 +67,16 @@ func LoadConfigFile() error {
 	return nil
 }
 
-func InitConfigEnv(en map[string]string) {
+func InitConfig() {
 	var err error
-	env = en
+
+	pconfig := flag.String("config", "../config.cfg", "config file")
+	psection := flag.String("section", "dev", "section of config file to apply")
+	flag.Parse()
+	env = map[string]string{
+		"config":  *pconfig,
+		"section": *psection,
+	}
 	_, ok := env["config"]
 	_, ok1 := env["section"]
 	if !ok || !ok1 {
@@ -79,5 +86,10 @@ func InitConfigEnv(en map[string]string) {
 	defaultConfig, err = conf.ReadDefault(configpath)
 	if err != nil {
 		slog.Fatalf("ReadDefault failed. err=%v\n", err)
+	}
+
+	err = loadConfigFile()
+	if err != nil {
+		slog.Fatalf("LoadConfigFile failed!err:=%v", err)
 	}
 }
