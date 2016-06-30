@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package generator;
+
+service IdGenerator {
+  rpc Generate (GenerateReq) returns (GenerateRsp) {}
+}
+
+message GenerateReq {
+	enum IdType {
+		User = 0;
+		Group = 1;
+	 	UserMessage = 2;
+		GroupMessage = 3;
+	}
+	IdType Type =1;
+}
+
+message GenerateRsp {
+	int64  Id = 1;
+}
+

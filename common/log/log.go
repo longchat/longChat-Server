@@ -2,9 +2,10 @@ package log
 
 import (
 	"errors"
-	"github.com/YueHonghui/rfw"
 	slog "log"
 	"sync"
+
+	"github.com/YueHonghui/rfw"
 )
 
 var ERROR *slog.Logger
@@ -22,7 +23,7 @@ type bufLogger struct {
 var lwriter *bufLogger
 var awriter *bufLogger
 
-func InitLogger(logpath string, alogpath string, achansize int, lchansize int) error {
+func InitLogger(logpath string, alogpath string, lchansize int, achansize int) error {
 	var err error
 	lwriter = &bufLogger{
 		channel:      make(chan []byte, lchansize),
@@ -98,4 +99,3 @@ func FiniLogger() {
 	awriter.Close()
 	lwriter.Close()
 }
-

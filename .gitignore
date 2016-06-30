@@ -1,8 +1,7 @@
 *~
 ssl/
-apiService
-idService
-msgService
-storageService
-longChat-Server
-logs
+apiService/apiService
+idService/idService
+msgService/msgService
+storageService/storageService
+logs/

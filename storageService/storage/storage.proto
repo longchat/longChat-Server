@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package storage;
+
+import "longChat-Server/common/baseproto/base.proto";
+
+
+service Storage {
+  rpc CreateUser (CreateUserReq) returns (baseproto.BaseRsp) {}
+}
+
+message CreateUserReq {
+	int64  id = 1;
+	string UserName = 2;
+	string Password = 3;
+	string LastLoginIp = 4;
+}
+
+
