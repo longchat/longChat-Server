@@ -18,7 +18,7 @@ type UserApi struct {
 
 func (ua *UserApi) RegisterRoute(framework *iris.Framework) {
 	users := framework.Party("/users")
-	users.Post("", ua.CreateUser)
+	users.Post("", ua.createUser)
 }
 
 func getHashedPassword(raw string, salt string) string {
@@ -26,7 +26,7 @@ func getHashedPassword(raw string, salt string) string {
 	return hex.EncodeToString(sha[:])
 }
 
-func (ua *UserApi) CreateUser(c *iris.Context) {
+func (ua *UserApi) createUser(c *iris.Context) {
 	var userReq dto.CreateUserReq
 	err := c.ReadJSON(&userReq)
 	if err != nil {

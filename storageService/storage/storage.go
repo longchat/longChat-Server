@@ -31,8 +31,12 @@ func (s *Storage) Init() error {
 	if err != nil {
 		return errors.New(consts.ErrGetConfigFailed(consts.StorageServiceDbPsw, err))
 	}
-
-	session, err := mgo.Dial(fmt.Sprintf("mongodb://%s:%s@%s/%s", dbUser, dbPsw, dbAddr, dbName))
+	var session *mgo.Session
+	if dbUser == "" {
+		session, err = mgo.Dial(dbAddr)
+	} else {
+		session, err = mgo.Dial(fmt.Sprintf("mongodb://%s:%s@%s/%s", dbUser, dbPsw, dbAddr, dbName))
+	}
 	if err != nil {
 		return err
 	}
