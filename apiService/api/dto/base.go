@@ -11,9 +11,16 @@ type BaseRsp struct {
 	Error string
 }
 
-func PostDataErrRsp(dataName string) *BaseRsp {
+func PasswordNotMatchErrRsp() *BaseRsp {
 	return &BaseRsp{
 		StatusCode: 1,
+		Error:      fmt.Sprintf("password or username not matched!"),
+	}
+}
+
+func PostDataErrRsp(dataName string) *BaseRsp {
+	return &BaseRsp{
+		StatusCode: 1000,
 		Error:      fmt.Sprintf("invalid POST data(%s)", dataName),
 	}
 }
@@ -28,16 +35,16 @@ func ParameterErrRsp(params ...string) *BaseRsp {
 	}
 
 	return &BaseRsp{
-		StatusCode: 2,
+		StatusCode: 1001,
 		Error:      fmt.Sprintf("invalid url parameters(%s)", s),
 	}
 }
 
 func InternalErrRsp() *BaseRsp {
-	return &BaseRsp{StatusCode: 3, Error: "internal server error"}
+	return &BaseRsp{StatusCode: 1002, Error: "internal server error"}
 }
 
-func SuccessResponse() *BaseRsp {
+func SuccessRsp() *BaseRsp {
 	var succRsp BaseRsp = BaseRsp{StatusCode: 0, Error: ""}
 	return &succRsp
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
+	"github.com/longchat/longChat-Server/storageService/storage/schema"
 
 	"gopkg.in/mgo.v2"
 )
@@ -45,7 +46,6 @@ func (s *Storage) Init() error {
 		return err
 	}
 	session.SetMode(mgo.Monotonic, true)
-
 	s.db = session.DB(dbName)
 	return nil
 }
@@ -55,7 +55,21 @@ func (s *Storage) Close() {
 		s.db.Session.Close()
 	}
 }
-
+func (s *Storage) UpdateUserInfo(id int64, nickName string, avatar string, intro string) error {
+	return updateUserInfo(s.db, id, nickName, avatar, intro)
+}
 func (s *Storage) CreateUser(id int64, userName string, password string, salt string, lastLoginIp string) error {
 	return createUser(s.db, id, userName, password, salt, lastLoginIp)
+}
+
+func (s *Storage) GetUserByUserName(userName string) (*schema.User, error) {
+	return getUserByUserName(s.db, userName)
+}
+
+func (s *Storage) GetUser(id int64) (*schema.User, error) {
+	return getUserById(s.db, id)
+}
+
+func (s *Storage) GetGroupsByOrderIdx(orderIdx int64, limit int) ([]schema.Group, error) {
+	return getGroupsByOrderIdx(s.db, orderIdx, limit)
 }
