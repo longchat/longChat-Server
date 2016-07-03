@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/kataras/iris"
@@ -29,14 +30,15 @@ func (ua *UserApi) getInfo(c *iris.Context) {
 		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
 		return
 	}
-	user, err := ua.store.GetUser(uid)
+	user, err := ua.store.GetUserById(uid)
 	if err != nil {
 		log.ERROR.Printf("get usser(%d) from storage failed!err:=%v\n", uid, err)
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
 		return
 	}
 	userRsp := dto.GetUserInfoRsp{BaseRsp: *dto.SuccessRsp()}
-	userRsp.Data = dto.UserInfo{
+	userRsp.Data.User = dto.UserInfo{
+		Id:        fmt.Sprintf("%d", user.Id),
 		NickName:  user.NickName,
 		Avatar:    user.Avatar,
 		Introduce: user.Introduce,

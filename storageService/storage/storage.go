@@ -66,10 +66,18 @@ func (s *Storage) GetUserByUserName(userName string) (*schema.User, error) {
 	return getUserByUserName(s.db, userName)
 }
 
-func (s *Storage) GetUser(id int64) (*schema.User, error) {
+func (s *Storage) GetUserById(id int64) (*schema.User, error) {
 	return getUserById(s.db, id)
+}
+
+func (s *Storage) GetUsersById(ids []int64) ([]schema.User, error) {
+	return getUsersById(s.db, ids)
 }
 
 func (s *Storage) GetGroupsByOrderIdx(orderIdx int64, limit int) ([]schema.Group, error) {
 	return getGroupsByOrderIdx(s.db, orderIdx, limit)
+}
+
+func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
+	return getGroupById(s.db, id)
 }

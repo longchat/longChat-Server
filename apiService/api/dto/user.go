@@ -1,6 +1,7 @@
 package dto
 
 type UserInfo struct {
+	Id 	string
 	NickName  string
 	Avatar    string
 	Introduce string
@@ -17,5 +18,9 @@ type UpdateInfoReq struct {
 
 type GetUserInfoRsp struct {
 	BaseRsp
-	Data UserInfo
+	Data GetUserInfoData
+}
+
+type GetUserInfoData struct{
+	User UserInfo
 }

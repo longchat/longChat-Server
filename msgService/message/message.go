@@ -8,6 +8,10 @@ import (
 )
 
 func Init(framework *iris.Framework) {
+	framework.UseFunc(func(c *iris.Context) {
+		fmt.Println("session", c.Session().ID())
+		c.Next()
+	})
 	framework.Config.Websocket.Endpoint = "/websocket"
 
 	ws := framework.Websocket
@@ -20,7 +24,6 @@ func Init(framework *iris.Framework) {
 		})
 
 		c.OnDisconnect(func() {
-			fmt.Printf("\nConnection with ID: %s has been disconnected!", c.ID())
 		})
 	})
 }

@@ -14,7 +14,8 @@ const (
 	StorageServiceDbUser = "service.storage.db.user"
 	StorageServiceDbPsw  = "service.storage.db.psw"
 
-	ApiServiceAddress = "service.api.address"
+	ApiServiceAddress    = "service.api.address"
+	ApiServiceStaticPath = "service.api.staticpath"
 
 	ErrorLogPath  = "log.error.path"
 	AccessLogPath = "log.access.path"

@@ -16,3 +16,12 @@ func getGroupsByOrderIdx(db *mgo.Database, orderIdx int64, limit int) ([]schema.
 	}
 	return groups, nil
 }
+func getGroupById(db *mgo.Database, id int64) (*schema.Group, error) {
+	var group schema.Group
+	err := db.C("Group").FindId(id).One(&group)
+	if err != nil && err != mgo.ErrNotFound {
+		log.ERROR.Printf("find group by id(%d) from db failed!err:=%v\n", id, err)
+		return nil, err
+	}
+	return &group, nil
+}

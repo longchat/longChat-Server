@@ -3,7 +3,6 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 
 	"github.com/longchat/longChat-Server/common/log"
@@ -50,7 +49,6 @@ func (au *AuthApi) login(c *iris.Context) {
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
 		return
 	}
-	fmt.Println(c.Session().Get("UserName").(string)+"  id:", c.Session().ID())
 	c.JSON(http.StatusOK, dto.SuccessRsp())
 }
 

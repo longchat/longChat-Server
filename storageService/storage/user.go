@@ -45,3 +45,13 @@ func getUserById(db *mgo.Database, id int64) (*schema.User, error) {
 	}
 	return &user, nil
 }
+
+func getUsersById(db *mgo.Database, ids []int64) ([]schema.User, error) {
+	var users []schema.User
+	err := db.C("User").Find(bson.M{"_id": bson.M{"$in": ids}}).All(&users)
+	if err != nil && err != mgo.ErrNotFound {
+		log.ERROR.Printf("find user(%v) from db failed!err:=%v\n", ids, err)
+		return nil, err
+	}
+	return users, nil
+}
