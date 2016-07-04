@@ -5,10 +5,9 @@ import (
 	"encoding/hex"
 	"net/http"
 
-	"github.com/longchat/longChat-Server/common/log"
-
 	"github.com/kataras/iris"
 	"github.com/longchat/longChat-Server/apiService/api/dto"
+	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
@@ -43,12 +42,14 @@ func (au *AuthApi) login(c *iris.Context) {
 		c.JSON(http.StatusUnauthorized, dto.PasswordNotMatchErrRsp())
 		return
 	}
+
 	err = c.Session().Set("UserName", loginReq.UserName)
 	if err != nil {
 		log.ERROR.Printf("get session from redis failed!err:=%v\n", err)
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
 		return
 	}
+
 	c.JSON(http.StatusOK, dto.SuccessRsp())
 }
 

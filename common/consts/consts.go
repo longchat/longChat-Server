@@ -9,18 +9,27 @@ const (
 	IdServiceStartIdx = "service.id.startidx"
 	IdServiceStep     = "service.id.step"
 
-	StorageServiceDbName = "service.storage.db.name"
-	StorageServiceDbAddr = "service.storage.db.addr"
-	StorageServiceDbUser = "service.storage.db.user"
-	StorageServiceDbPsw  = "service.storage.db.psw"
+	MongoDbName = "mongodb.dbname"
+	MongoDbAddr = "mongodb.addr"
+	MongoDbUser = "mongodb.user"
+	MongoDbPsw  = "mongodb.psw"
 
 	ApiServiceAddress    = "service.api.address"
 	ApiServiceStaticPath = "service.api.staticpath"
+
+	MsgServiceAddress = "service.msg.address"
+	RouterServiceAddress = "service.router.address"
 
 	ErrorLogPath  = "log.error.path"
 	AccessLogPath = "log.access.path"
 
 	TlsEnable = "security.tls.enable"
+
+	RedisAddress  = "redis.address"
+	RedisPassword = "redis.password"
+
+	SessionCookieName = "session.cookie"
+	SessionPrefix     = "session.prefix"
 )
 
 func ErrGetConfigFailed(configName string, err error) string {

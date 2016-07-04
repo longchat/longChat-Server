@@ -16,21 +16,21 @@ type Storage struct {
 }
 
 func (s *Storage) Init() error {
-	dbName, err := config.GetConfigString(consts.StorageServiceDbName)
+	dbName, err := config.GetConfigString(consts.MongoDbName)
 	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.StorageServiceDbName, err))
+		return errors.New(consts.ErrGetConfigFailed(consts.MongoDbName, err))
 	}
-	dbAddr, err := config.GetConfigString(consts.StorageServiceDbAddr)
+	dbAddr, err := config.GetConfigString(consts.MongoDbAddr)
 	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.StorageServiceDbAddr, err))
+		return errors.New(consts.ErrGetConfigFailed(consts.MongoDbAddr, err))
 	}
-	dbUser, err := config.GetConfigString(consts.StorageServiceDbUser)
+	dbUser, err := config.GetConfigString(consts.MongoDbUser)
 	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.StorageServiceDbUser, err))
+		return errors.New(consts.ErrGetConfigFailed(consts.MongoDbUser, err))
 	}
-	dbPsw, err := config.GetConfigString(consts.StorageServiceDbPsw)
+	dbPsw, err := config.GetConfigString(consts.MongoDbPsw)
 	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.StorageServiceDbPsw, err))
+		return errors.New(consts.ErrGetConfigFailed(consts.MongoDbPsw, err))
 	}
 	var session *mgo.Session
 	if dbUser == "" {

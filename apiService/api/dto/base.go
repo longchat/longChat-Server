@@ -17,7 +17,12 @@ func PasswordNotMatchErrRsp() *BaseRsp {
 		Error:      fmt.Sprintf("password or username not matched!"),
 	}
 }
-
+func SessionNotFoudErrRsp() *BaseRsp {
+	return &BaseRsp{
+		StatusCode: 2,
+		Error:      fmt.Sprintf("session not found!"),
+	}
+}
 func PostDataErrRsp(dataName string) *BaseRsp {
 	return &BaseRsp{
 		StatusCode: 1000,
