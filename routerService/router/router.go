@@ -1,18 +1,24 @@
 package router
 
 import (
-	"errors"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/longchat/longChat-Server/common/config"
-	"github.com/longchat/longChat-Server/common/consts"
-	"github.com/longchat/longChat-Server/common/log"
-	"golang.org/x/net/context"
+	"github.com/longchat/longChat-Server/common/channel"
+	"github.com/longchat/longChat-Server/common/channel/protoc"
+
 	"google.golang.org/grpc"
 )
+
+func convertIpTo4Byte(ip net.IP) [4]byte {
+	var b [4]byte
+	b[0] = ip[0]
+	b[1] = ip[1]
+	b[2] = ip[2]
+	b[3] = ip[3]
+	return b
+}
 
 type Router struct {
 	conn       *grpc.ClientConn
@@ -22,35 +28,15 @@ type Router struct {
 	gLock  *sync.RWMutex
 	sLock  *sync.RWMutex
 	groups map[int64]groupworker
-	sChans map[net.IP]chan message
+	sChans map[[4]byte]chan protoc.Message
 }
 
 type groupworker struct {
 	senders []net.IP
-	mChan   chan message
-}
-
-type message struct {
-	id      int64
-	from    int64
-	to      string
-	content string
-	msgtype string
+	mChan   chan protoc.Message
 }
 
 func (r *Router) Init(rpcEnabled bool) error {
-	r.rpcEnabled = rpcEnabled
-	if rpcEnabled {
-		address, err := config.GetConfigString(consts.RouterServiceAddress)
-		if err != nil {
-			return errors.New(consts.ErrGetConfigFailed(consts.RouterServiceAddress, err))
-		}
-		r.conn, err = grpc.Dial(address, grpc.WithInsecure())
-		if err != nil {
-			return errors.New(consts.ErrGetConfigFailed(consts.IdServiceAddress, err))
-		}
-		r.client = NewRouterClient(r.conn)
-	}
 	r.gLock = new(sync.RWMutex)
 	r.sLock = new(sync.RWMutex)
 	return nil
@@ -62,23 +48,19 @@ func (r *Router) Close() {
 	}
 }
 
-func (r *Router) groupFetcher(gId int64, gCh chan message) {
+func (r *Router) groupFetcher(gId int64, gCh chan protoc.Message) {
 	for msg := range gCh {
 		r.gLock.RLock()
 		group := r.groups[gId]
 		r.gLock.RUnlock()
+		msg.Id = time.Now().UnixNano()
 		for i := range group.senders {
-			r.sLock.RLock()
-			sCh := r.sChans[group.senders[i]]
-			r.sLock.RUnlock()
-			sCh <- message
+			//r.sLock.RLock()
+			//sCh := r.sChans[convertIpTo4Byte(group.senders[i])]
+			//r.sLock.RUnlock()
+			//sCh <- msg
+			channel.GetMsgChannel(group.senders[i]) <- msg
 		}
-	}
-}
-
-func (r *Router) sender(addr string, sCh chan message) {
-	for msg := range sCh {
-
 	}
 }
 
@@ -89,9 +71,9 @@ func (r *Router) messageIn(req *MessageInReq) {
 		r.gLock.RUnlock()
 		return
 	} else {
-		mCh = group.mChan
+		mCh := group.mChan
 		r.gLock.RUnlock()
-		mCh <- message{from: req.From, to: req.To, content: req.Content, msgtype: req.Type}
+		mCh <- protoc.Message{From: req.From, To: req.To, Content: req.Content, Type: req.Type}
 	}
 }
 
@@ -100,16 +82,16 @@ func (r *Router) groupUp(req *GroupUpReq) {
 	r.gLock.Lock()
 	groupWork, isok := r.groups[req.GroupId]
 	if !isok {
-		msgChan := make(chan message)
+		msgChan := make(chan protoc.Message)
 		senders := make([]net.IP, 1)
-		senders[0] = net.ParseIP(ip)
+		senders[0] = ip
 		groupWork = groupworker{senders: senders, mChan: msgChan}
 		r.groups[req.GroupId] = groupWork
 		r.gLock.Unlock()
 		go r.groupFetcher(req.GroupId, msgChan)
 	} else {
 		for i := range groupWork.senders {
-			if groupWork[i] == ip {
+			if convertIpTo4Byte(groupWork.senders[i]) == convertIpTo4Byte(ip) {
 				r.gLock.Unlock()
 				return
 			}
@@ -124,13 +106,11 @@ func (r *Router) groupUp(req *GroupUpReq) {
 func (r *Router) serverUp(req *ServerUpReq) {
 	ip := net.ParseIP(req.ServerAddr)
 	r.sLock.Lock()
-	_, isok := r.sChans[ip]
+	_, isok := r.sChans[convertIpTo4Byte(ip)]
 	if isok {
 		r.sLock.Unlock()
 		return
 	}
-	r.sChans[ip] = make(chan message, 1000)
+	r.sChans[convertIpTo4Byte(ip)] = make(chan protoc.Message, 1000)
 	r.sLock.Unlock()
-	go sender(req.ServerAddr, sChan)
-
 }
