@@ -6,6 +6,7 @@ import "github.com/longchat/longChat-Server/common/baseproto/base.proto";
 
 service Router {
   rpc GroupUp (GroupUpReq) returns (baseproto.BaseRsp) {}
+  rpc ServerUp (ServerUpReq) returns (baseproto.BaseRsp) {}
   rpc MessageIn (MessageInReq) returns (baseproto.BaseRsp) {}
 }
 
@@ -22,4 +23,6 @@ message MessageInReq {
 	int64 GroupId=5;
 }
 
-
+message ServerUpReq{
+	string ServerAddr=1;
+}
