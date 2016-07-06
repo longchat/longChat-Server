@@ -48,7 +48,9 @@ func main() {
 
 	framework := iris.New()
 	api.Iint(framework, &idGen, &store)
-	message.Init(framework)
+	m := message.Messenger{}
+	m.Init(framework)
+	defer m.Close()
 	framework.Listen(addr)
 
 }

@@ -3,6 +3,7 @@ ssl/
 apiService/apiService
 idService/idService
 msgService/msgService
+routerService/routerService
 storageService/storageService
 logs/
 config.cfg

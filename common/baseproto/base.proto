@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package baseproto;
-
-message BaseRsp {
-	int64 StatusCode = 1;
-	string Err = 2;
-}

@@ -16,6 +16,8 @@ func main() {
 		slog.Fatalln(consts.ErrGetConfigFailed(consts.MsgServiceAddress, err))
 	}
 	framework := iris.New()
-	message.Init(framework)
+	m := message.Messenger{}
+	m.Init(framework)
+	defer m.Close()
 	framework.Listen(addr)
 }

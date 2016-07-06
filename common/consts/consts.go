@@ -30,6 +30,8 @@ const (
 
 	SessionCookieName = "session.cookie"
 	SessionPrefix     = "session.prefix"
+
+	PrivateToken = "security.token"
 )
 
 func ErrGetConfigFailed(configName string, err error) string {

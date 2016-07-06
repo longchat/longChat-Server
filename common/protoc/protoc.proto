@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package protoc;
+
+service Message {
+  rpc Message (MessageReq) returns (BaseRsp) {}
+}
+
+service Router {
+  rpc GroupUp (GroupUpReq) returns (BaseRsp) {}
+  rpc ServerUp (ServerUpReq) returns (BaseRsp) {}
+  rpc Message (MessageReq) returns (BaseRsp) {}
+}
+
+message BaseRsp {
+	int64 StatusCode = 1;
+	string Err = 2;
+}
+
+message GroupUpReq {
+	int64 GroupId=1;
+	string ServerAddr=2;
+}
+
+message MessageReq {
+	int64 Id=1;
+	int64 From=2;
+	int64 To=3;
+	string Content=4;
+	string Type=5;
+	int64 GroupId=6;
+}
+
+message ServerUpReq{
+	string ServerAddr=1;
+}
+
+
