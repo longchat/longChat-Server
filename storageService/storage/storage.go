@@ -3,19 +3,58 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/storageService/storage/schema"
-
 	"gopkg.in/mgo.v2"
+	"gopkg.in/redis.v4"
 )
 
 type Storage struct {
-	db *mgo.Database
+	db    *mgo.Database
+	redis *redis.Client
+
+	sessionPrefix string
 }
 
-func (s *Storage) Init() error {
+func (s *Storage) initRedis() error {
+	redisAddr, err := config.GetConfigString(consts.RedisAddress)
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.RedisAddress, err))
+	}
+	redisPsw, err := config.GetConfigString(consts.RedisPassword)
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.RedisPassword, err))
+	}
+	redisDb, err := config.GetConfigInt(consts.RedisDb)
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.RedisDb, err))
+	}
+	s.redis = redis.NewClient(&redis.Options{
+		Addr:         redisAddr,
+		Password:     redisPsw, // no password set
+		DB:           redisDb,  // use default DB
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  10 * time.Second,
+		PoolSize:     128,
+	})
+	_, err = s.redis.Ping().Result()
+	if err != nil {
+		return errors.New(fmt.Sprintf("ping redis failed!err:=%v", err))
+	}
+
+	s.sessionPrefix, err = config.GetConfigString(consts.SessionPrefix)
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.SessionPrefix, err))
+	}
+	return nil
+}
+
+func (s *Storage) initMongo() error {
 	dbName, err := config.GetConfigString(consts.MongoDbName)
 	if err != nil {
 		return errors.New(consts.ErrGetConfigFailed(consts.MongoDbName, err))
@@ -50,6 +89,14 @@ func (s *Storage) Init() error {
 	return nil
 }
 
+func (s *Storage) Init() error {
+	err := s.initMongo()
+	if err != nil {
+		return err
+	}
+	return s.initRedis()
+}
+
 func (s *Storage) Close() {
 	if s.db.Session != nil {
 		s.db.Session.Close()
@@ -80,4 +127,8 @@ func (s *Storage) GetGroupsByOrderIdx(orderIdx int64, limit int) ([]schema.Group
 
 func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
 	return getGroupById(s.db, id)
+}
+
+func (s *Storage) GetSessionValue(key string) (map[interface{}]interface{}, error) {
+	return getSessionValue(s.redis, s.sessionPrefix+key)
 }

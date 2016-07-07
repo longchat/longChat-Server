@@ -57,7 +57,7 @@ func (au *AuthApi) login(c *iris.Context) {
 		return
 	}
 
-	err = c.Session().Set("UserName", loginReq.UserName)
+	err = c.Session().Set("Id", user.Id)
 	if err != nil {
 		log.ERROR.Printf("get session from redis failed!err:=%v\n", err)
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
