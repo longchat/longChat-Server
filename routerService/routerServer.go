@@ -13,7 +13,7 @@ import (
 )
 
 type routerServer struct {
-	router router.Router
+	router *router.Router
 }
 
 func (r *routerServer) Message(ctx context.Context, in *protoc.MessageReq) (*protoc.BaseRsp, error) {
@@ -33,8 +33,7 @@ func (r *routerServer) ServerUp(ctx context.Context, in *protoc.ServerUpReq) (*p
 
 func main() {
 	config.InitConfig()
-	routerSer := routerServer{}
-	routerSer.router = router.Router{}
+	routerSer := routerServer{router: &router.Router{}}
 	routerSer.router.Init()
 
 	addr, err := config.GetConfigString(consts.RouterServiceAddress)

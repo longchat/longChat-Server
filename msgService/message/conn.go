@@ -1,7 +1,6 @@
 package message
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"time"
@@ -25,11 +24,12 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512
+	maxMessageSize = 1024
 )
 
 // Conn is an middleman between the websocket connection and the hub.
 type Conn struct {
+	id int
 	// The websocket connection.
 	ws *websocket.Conn
 
@@ -38,7 +38,7 @@ type Conn struct {
 }
 
 // readPump pumps messages from the websocket connection to the hub.
-func (c *Conn) readPump() {
+func (c *Conn) readPump(uid int64, gids []int64) {
 	defer func() {
 		c.ws.Close()
 	}()
@@ -57,9 +57,22 @@ func (c *Conn) readPump() {
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		//message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		data := MessageData{Data: message}
+		if data.GetHeader() == DataTypeGroupMessage {
+			var gMsg DataGroupMessage
+			err := data.GetData(&gMsg)
+			if err != nil {
+				fmt.Println("unmarshall data(%s) failed!", string(message))
+				c.ws.Close()
+				close(c.send)
+				break
+			}
+			fmt.Println("get msg:", gMsg)
+		}
 		c.send <- message
 	}
+	command <- connDel{conn: c, userId: uid, groupId: gids}
 }
 
 // write writes a message with the given message type and payload.

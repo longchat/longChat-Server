@@ -68,13 +68,8 @@ func (au *AuthApi) login(c *iris.Context) {
 	userDto.Avatar = user.Avatar
 	userDto.Introduce = user.Introduce
 	userDto.NickName = user.NickName
-	token, err := newToken(user.Id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
-		return
-	}
+
 	var rsp dto.LoginRsp
-	rsp.Data.Token = token
 	rsp.Data.User = userDto
 	c.JSON(http.StatusOK, &rsp)
 }

@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/longchat/longChat-Server/storageService/storage"
-
 	"github.com/gorilla/websocket"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/common/protoc"
+	"github.com/longchat/longChat-Server/storageService/storage"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -19,7 +19,7 @@ var cookieName string
 var redisPrefix string
 
 type Messenger struct {
-	router   *protoc.RouterClient
+	router   protoc.RouterClient
 	conn     *grpc.ClientConn
 	store    *storage.Storage
 	upgrader websocket.Upgrader
@@ -35,24 +35,35 @@ func (m *Messenger) Init(store *storage.Storage) {
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.RouterServiceAddress, err))
 	}
-	m.conn, err = grpc.Dial(routerAddr, grpc.WithInsecure())
+	msgAddr, err := config.GetConfigString(consts.MsgServiceBackendAddress)
 	if err != nil {
-		log.Fatalf("dial to router(%s) failed!err:=%v", err)
+		log.Fatalf(consts.ErrGetConfigFailed(consts.MsgServiceBackendAddress, err))
 	}
-	c := protoc.NewRouterClient(m.conn)
-	m.router = &c
-
 	cookieName, err = config.GetConfigString(consts.SessionCookieName)
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.SessionCookieName, err))
 	}
-	fmt.Println(cookieName, redisPrefix)
 	m.upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 	m.store = store
+
+	m.conn, err = grpc.Dial(routerAddr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("dial to router(%s) failed!err:=%v", err)
+	}
+	c := protoc.NewRouterClient(m.conn)
+	m.router = c
+	rsp, err := m.router.ServerUp(context.Background(), &protoc.ServerUpReq{ServerAddr: msgAddr})
+	if err != nil || rsp.StatusCode != 0 {
+		log.Fatalf("send ServerUp to router failed!err1:=%v,err2:=%v", err, rsp.Err)
+	}
+}
+
+func (m *Messenger) MessageIn(req *protoc.MessageReq) {
+	fmt.Println("message in:", *req)
 }
 
 func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +85,6 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	fmt.Println(sId)
 
 	rmap, err := m.store.GetSessionValue(sId)
 	if err != nil {
@@ -92,8 +102,17 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-
 	conn := &Conn{send: make(chan []byte, 256), ws: ws}
+	u, err := m.store.GetUserById(id.(int64))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	var gids []int64 = make([]int64, 0, 5)
+	for i := range u.JoinedGroups {
+		gids = append(gids, u.JoinedGroups[i].Id)
+	}
+	command <- connAdd{conn: conn, userId: u.Id, groupId: gids}
 	go conn.writePump()
-	conn.readPump()
+	conn.readPump(u.Id, gids)
 }

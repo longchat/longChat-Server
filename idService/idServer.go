@@ -13,7 +13,7 @@ import (
 
 // server is used to implement helloworld.GreeterServer.
 type generatorServer struct {
-	idGenerator generator.IdGenerator
+	idGenerator *generator.IdGenerator
 }
 
 // SayHello implements helloworld.GreeterServer
@@ -26,7 +26,7 @@ func main() {
 	config.InitConfig()
 
 	server := generatorServer{}
-	server.idGenerator = generator.IdGenerator{}
+	server.idGenerator = &generator.IdGenerator{}
 	err := server.idGenerator.Init(false)
 	defer server.idGenerator.Close()
 	if err != nil {

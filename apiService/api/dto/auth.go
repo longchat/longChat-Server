@@ -11,6 +11,5 @@ type LoginRsp struct {
 }
 
 type LoginData struct {
-	User  UserInfo
-	Token string
+	User UserInfo
 }

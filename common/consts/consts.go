@@ -20,8 +20,9 @@ const (
 	ApiServiceAddress    = "service.api.address"
 	ApiServiceStaticPath = "service.api.staticpath"
 
-	MsgServiceAddress    = "service.msg.address"
-	RouterServiceAddress = "service.router.address"
+	MsgServiceAddress        = "service.msg.address"
+	MsgServiceBackendAddress = "service.msg.backend.address"
+	RouterServiceAddress     = "service.router.address"
 
 	ErrorLogPath  = "log.error.path"
 	AccessLogPath = "log.access.path"

@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -20,17 +21,19 @@ type Router struct {
 	gLock  *sync.RWMutex
 	sLock  *sync.RWMutex
 	groups map[int64]groupworker
-	sChans map[[4]byte]chan protoc.MessageReq
+	sChans map[string]chan protoc.MessageReq
 }
 
 type groupworker struct {
-	senders []net.IP
+	senders []string
 	mChan   chan protoc.MessageReq
 }
 
 func (r *Router) Init() error {
 	r.gLock = new(sync.RWMutex)
 	r.sLock = new(sync.RWMutex)
+	r.groups = make(map[int64]groupworker, 200)
+	r.sChans = make(map[string]chan protoc.MessageReq, 5)
 	return nil
 }
 
@@ -42,7 +45,7 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 	}
 	defer conn.Close()
 	client := protoc.NewMessageClient(conn)
-
+	fmt.Println(r.sChans, "  ", addr)
 	for data := range sCh {
 		reply, err := client.Message(context.Background(), &data)
 		if err != nil || reply.StatusCode != 0 {
@@ -64,7 +67,7 @@ func (r *Router) groupFetcher(gId int64, gCh chan protoc.MessageReq) {
 		msg.Id = time.Now().UnixNano()
 		for i := range group.senders {
 			r.sLock.RLock()
-			sCh := r.sChans[convertIpTo4Byte(group.senders[i])]
+			sCh := r.sChans[group.senders[i]]
 			r.sLock.RUnlock()
 			sCh <- msg
 		}
@@ -85,12 +88,12 @@ func (r *Router) MessageIn(req *protoc.MessageReq) {
 }
 
 func (r *Router) GroupUp(req *protoc.GroupUpReq) {
-	ip := net.ParseIP(req.ServerAddr)
+	ip := req.ServerAddr
 	r.gLock.Lock()
 	groupWork, isok := r.groups[req.GroupId]
 	if !isok {
 		msgChan := make(chan protoc.MessageReq)
-		senders := make([]net.IP, 1)
+		senders := make([]string, 1)
 		senders[0] = ip
 		groupWork = groupworker{senders: senders, mChan: msgChan}
 		r.groups[req.GroupId] = groupWork
@@ -98,7 +101,7 @@ func (r *Router) GroupUp(req *protoc.GroupUpReq) {
 		go r.groupFetcher(req.GroupId, msgChan)
 	} else {
 		for i := range groupWork.senders {
-			if convertIpTo4Byte(groupWork.senders[i]) == convertIpTo4Byte(ip) {
+			if groupWork.senders[i] == ip {
 				r.gLock.Unlock()
 				return
 			}
@@ -111,15 +114,14 @@ func (r *Router) GroupUp(req *protoc.GroupUpReq) {
 }
 
 func (r *Router) ServerUp(req *protoc.ServerUpReq) {
-	ip := net.ParseIP(req.ServerAddr)
 	r.sLock.Lock()
-	_, isok := r.sChans[convertIpTo4Byte(ip)]
+	_, isok := r.sChans[req.ServerAddr]
 	if isok {
 		r.sLock.Unlock()
 		return
 	}
 	chans := make(chan protoc.MessageReq, 1000)
-	r.sChans[convertIpTo4Byte(ip)] = chans
+	r.sChans[req.ServerAddr] = chans
 	r.sLock.Unlock()
 	go r.sender(req.ServerAddr, chans)
 }
