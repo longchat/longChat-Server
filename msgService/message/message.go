@@ -15,27 +15,29 @@ import (
 	"google.golang.org/grpc"
 )
 
+var msgAddr string
 var cookieName string
 var redisPrefix string
 
+var router protoc.RouterClient
+var conn *grpc.ClientConn
+var store *storage.Storage
+
 type Messenger struct {
-	router   protoc.RouterClient
-	conn     *grpc.ClientConn
-	store    *storage.Storage
 	upgrader websocket.Upgrader
 }
 
 func (m *Messenger) Close() {
-	if m.conn != nil {
-		m.conn.Close()
+	if conn != nil {
+		conn.Close()
 	}
 }
-func (m *Messenger) Init(store *storage.Storage) {
+func (m *Messenger) Init(db *storage.Storage) {
 	routerAddr, err := config.GetConfigString(consts.RouterServiceAddress)
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.RouterServiceAddress, err))
 	}
-	msgAddr, err := config.GetConfigString(consts.MsgServiceBackendAddress)
+	msgAddr, err = config.GetConfigString(consts.MsgServiceBackendAddress)
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.MsgServiceBackendAddress, err))
 	}
@@ -48,22 +50,23 @@ func (m *Messenger) Init(store *storage.Storage) {
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
-	m.store = store
+	store = db
 
-	m.conn, err = grpc.Dial(routerAddr, grpc.WithInsecure())
+	conn, err = grpc.Dial(routerAddr, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("dial to router(%s) failed!err:=%v", err)
 	}
-	c := protoc.NewRouterClient(m.conn)
-	m.router = c
-	rsp, err := m.router.ServerUp(context.Background(), &protoc.ServerUpReq{ServerAddr: msgAddr})
+	c := protoc.NewRouterClient(conn)
+	router = c
+	rsp, err := router.ServerUp(context.Background(), &protoc.ServerUpReq{ServerAddr: msgAddr})
 	if err != nil || rsp.StatusCode != 0 {
 		log.Fatalf("send ServerUp to router failed!err1:=%v,err2:=%v", err, rsp.Err)
 	}
+	go controller()
 }
 
 func (m *Messenger) MessageIn(req *protoc.MessageReq) {
-	fmt.Println("message in:", *req)
+	msgChan <- req
 }
 
 func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +89,7 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rmap, err := m.store.GetSessionValue(sId)
+	rmap, err := store.GetSessionValue(sId)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -102,8 +105,8 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	conn := &Conn{send: make(chan []byte, 256), ws: ws}
-	u, err := m.store.GetUserById(id.(int64))
+	conn := &Conn{send: make(chan *protoc.MessageReq, 128), ws: ws}
+	u, err := store.GetUserById(id.(int64))
 	if err != nil {
 		log.Println(err)
 		return

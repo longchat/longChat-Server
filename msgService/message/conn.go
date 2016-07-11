@@ -1,27 +1,31 @@
 package message
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/longchat/longChat-Server/common/protoc"
+	"golang.org/x/net/context"
 )
 
 var (
-	newline = []byte{'\n'}
+	newline = []byte{'\r', '\n'}
 	space   = []byte{' '}
 )
 
 const (
 	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Second
+	writeWait = 2 * time.Second
 
 	// Time allowed to read the next pong message from the peer.
 	pongWait = 60 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
+	pingPeriod = ((pongWait * 9) / 10) + 6
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 1024
@@ -34,7 +38,7 @@ type Conn struct {
 	ws *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	send chan *protoc.MessageReq
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -45,7 +49,6 @@ func (c *Conn) readPump(uid int64, gids []int64) {
 	c.ws.SetReadLimit(maxMessageSize)
 	c.ws.SetReadDeadline(time.Now().Add(pongWait))
 	c.ws.SetPongHandler(func(string) error {
-		fmt.Println("get pong")
 		c.ws.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -68,9 +71,13 @@ func (c *Conn) readPump(uid int64, gids []int64) {
 				close(c.send)
 				break
 			}
-			fmt.Println("get msg:", gMsg)
+			from, _ := strconv.ParseInt(gMsg.From, 10, 64)
+			gId, _ := strconv.ParseInt(gMsg.GroupId, 10, 64)
+			reply, err := router.Message(context.Background(), &protoc.MessageReq{From: from, GroupId: gId, Content: gMsg.Content, Type: gMsg.Type})
+			if err != nil || reply.StatusCode != 0 {
+				fmt.Println("post message to server failed!err:=%v,err:=%v", err, reply.Err)
+			}
 		}
-		c.send <- message
 	}
 	command <- connDel{conn: c, userId: uid, groupId: gids}
 }
@@ -102,20 +109,28 @@ func (c *Conn) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			mbytes, err := json.Marshal(message)
+			if err != nil {
+				fmt.Println("marshal data failed!err:=%v", *message)
+			}
+			w.Write(mbytes)
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
-				w.Write(<-c.send)
+				message = <-c.send
+				mbytes, err := json.Marshal(message)
+				if err != nil {
+					fmt.Println("marshal data failed!err:=%v", *message)
+				}
+				w.Write(mbytes)
 			}
 
 			if err := w.Close(); err != nil {
 				return
 			}
 		case <-ticker.C:
-			fmt.Println("write ping")
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}

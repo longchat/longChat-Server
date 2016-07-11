@@ -47,6 +47,7 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 	client := protoc.NewMessageClient(conn)
 	fmt.Println(r.sChans, "  ", addr)
 	for data := range sCh {
+		fmt.Println("post data:", data)
 		reply, err := client.Message(context.Background(), &data)
 		if err != nil || reply.StatusCode != 0 {
 			if err == nil {
@@ -61,6 +62,7 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 
 func (r *Router) groupFetcher(gId int64, gCh chan protoc.MessageReq) {
 	for msg := range gCh {
+		fmt.Println("Recevie msg", msg)
 		r.gLock.RLock()
 		group := r.groups[gId]
 		r.gLock.RUnlock()
@@ -83,11 +85,12 @@ func (r *Router) MessageIn(req *protoc.MessageReq) {
 	} else {
 		mCh := group.mChan
 		r.gLock.RUnlock()
-		mCh <- protoc.MessageReq{From: req.From, To: req.To, Content: req.Content, Type: req.Type}
+		mCh <- protoc.MessageReq{From: req.From, GroupId: req.GroupId, To: req.To, Content: req.Content, Type: req.Type}
 	}
 }
 
 func (r *Router) GroupUp(req *protoc.GroupUpReq) {
+	fmt.Println("group up")
 	ip := req.ServerAddr
 	r.gLock.Lock()
 	groupWork, isok := r.groups[req.GroupId]
@@ -110,7 +113,7 @@ func (r *Router) GroupUp(req *protoc.GroupUpReq) {
 		r.groups[req.GroupId] = groupWork
 		r.gLock.Unlock()
 	}
-
+	fmt.Println("group up:", r.groups)
 }
 
 func (r *Router) ServerUp(req *protoc.ServerUpReq) {
