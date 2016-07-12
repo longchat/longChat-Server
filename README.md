@@ -2,6 +2,7 @@
 基于websocket的聊天系统
 
 ##Features
-1.client与messageserver通讯使用websocket（支持tls）
+1.群聊由router协调转发，私聊不经过router直接转发，速度快
 
-2.支持负载均衡
+2.自动负载均衡
+

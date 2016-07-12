@@ -115,11 +115,24 @@ func addConn(c connAdd, id *int) {
 	}
 }
 
-type storeMessage struct {
-	storeType int
-	m         *protoc.MessageReq
+var storeChan chan *protoc.MessageReq
+var readChan chan userRead
+
+type userRead struct {
+	userId    int64
+	groupRead map[int64]int64
 }
 
 func msgPersist() {
+	userReadMap := make(map[int64]map[int64]int64, 200)
+	for {
+		select {
+		case read := <-readChan:
+			markRead(userReadMap, read)
+		}
+	}
+}
+
+func markRead(readMap map[int64]map[int64]int64, read userRead) {
 
 }
