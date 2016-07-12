@@ -71,9 +71,8 @@ func (c *Conn) readPump(uid int64, gids []int64) {
 				close(c.send)
 				break
 			}
-			from, _ := strconv.ParseInt(gMsg.From, 10, 64)
 			gId, _ := strconv.ParseInt(gMsg.GroupId, 10, 64)
-			reply, err := router.Message(context.Background(), &protoc.MessageReq{From: from, GroupId: gId, Content: gMsg.Content, Type: gMsg.Type})
+			reply, err := router.Message(context.Background(), &protoc.MessageReq{From: uid, GroupId: gId, Content: gMsg.Content, Type: gMsg.Type})
 			if err != nil || reply.StatusCode != 0 {
 				fmt.Println("post message to server failed!err:=%v,err:=%v", err, reply.Err)
 			}
@@ -109,7 +108,14 @@ func (c *Conn) writePump() {
 			if err != nil {
 				return
 			}
-			mbytes, err := json.Marshal(message)
+			var groupMsg DataGroupMessage = DataGroupMessage{
+				Id:      fmt.Sprintf("%d", message.Id),
+				From:    fmt.Sprintf("%d", message.From),
+				GroupId: fmt.Sprintf("%d", message.GroupId),
+				Content: message.Content,
+				Type:    message.Type,
+			}
+			mbytes, err := json.Marshal(&groupMsg)
 			if err != nil {
 				fmt.Println("marshal data failed!err:=%v", *message)
 			}
@@ -120,7 +126,14 @@ func (c *Conn) writePump() {
 			for i := 0; i < n; i++ {
 				w.Write(newline)
 				message = <-c.send
-				mbytes, err := json.Marshal(message)
+				groupMsg = DataGroupMessage{
+					Id:      fmt.Sprintf("%d", message.Id),
+					From:    fmt.Sprintf("%d", message.From),
+					GroupId: fmt.Sprintf("%d", message.GroupId),
+					Content: message.Content,
+					Type:    message.Type,
+				}
+				mbytes, err := json.Marshal(&groupMsg)
 				if err != nil {
 					fmt.Println("marshal data failed!err:=%v", *message)
 				}

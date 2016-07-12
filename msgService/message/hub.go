@@ -47,14 +47,11 @@ func controller() {
 }
 
 func processMessage(msg *protoc.MessageReq) {
-	fmt.Println("Process msg:", *msg)
 	if msg.GroupId > 0 {
 		users, isok := groupUser[msg.GroupId]
-		fmt.Println("users:", users)
 		if isok {
 			for k, _ := range users {
 				conns := userConn[k]
-				fmt.Println("conns:", conns)
 				for i := range conns {
 					conns[i].send <- msg
 				}
@@ -92,7 +89,6 @@ func removeConn(c connDel, id *int) {
 
 func addConn(c connAdd, id *int) {
 	(*id)++
-	fmt.Println("connAdd:", c)
 	c.conn.id = *id
 	user, isok := userConn[c.userId]
 	if !isok {
@@ -117,7 +113,6 @@ func addConn(c connAdd, id *int) {
 			groupUser[data] = group
 		}
 	}
-
 }
 
 type storeMessage struct {
