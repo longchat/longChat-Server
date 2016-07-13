@@ -3,7 +3,6 @@ package message
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -25,74 +24,69 @@ const (
 	pongWait = 60 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = ((pongWait * 9) / 10) + 6
+	pingPeriod = ((pongWait * 2) / 10) + 6
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 1024
 )
 
-// Conn is an middleman between the websocket connection and the hub.
 type Conn struct {
-	id int
-	// The websocket connection.
-	ws *websocket.Conn
-
-	// Buffered channel of outbound messages.
-	send chan *protoc.MessageReq
+	id      int
+	ws      *websocket.Conn
+	send    chan *protoc.MessageReq
+	session *Session
 }
 
-// readPump pumps messages from the websocket connection to the hub.
-func (c *Conn) readPump(uid int64, gids []int64) {
-	defer func() {
-		c.ws.Close()
-	}()
+func (c *Conn) closeConn() {
+	close(c.send)
+	c.ws.Close()
+}
+
+func (c *Conn) handleConn(command chan interface{}) {
 	c.ws.SetReadLimit(maxMessageSize)
 	c.ws.SetReadDeadline(time.Now().Add(pongWait))
 	c.ws.SetPongHandler(func(string) error {
 		c.ws.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
+	leave := make(chan bool)
+	go c.writePump(command, leave)
 	for {
 		_, message, err := c.ws.ReadMessage()
+		fmt.Println("read msg(%s)err:=%v", string(message), err)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				log.Printf("error: %v", err)
-			}
 			break
 		}
-		//message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		data := MessageData{Data: message}
 		if data.GetHeader() == DataTypeGroupMessage {
 			var gMsg DataGroupMessage
 			err := data.GetData(&gMsg)
 			if err != nil {
 				fmt.Println("unmarshall data(%s) failed!", string(message))
-				c.ws.Close()
-				close(c.send)
 				break
 			}
 			gId, _ := strconv.ParseInt(gMsg.GroupId, 10, 64)
-			reply, err := router.Message(context.Background(), &protoc.MessageReq{From: uid, GroupId: gId, Content: gMsg.Content, Type: gMsg.Type})
+			reply, err := router.Message(context.Background(), &protoc.MessageReq{From: c.session.userId, GroupId: gId, Content: gMsg.Content, Type: gMsg.Type})
 			if err != nil || reply.StatusCode != 0 {
 				fmt.Println("post message to server failed!err:=%v,err:=%v", err, reply.Err)
+				break
 			}
 		}
 	}
-	command <- connDel{conn: c, userId: uid, groupId: gids}
+	close(leave)
 }
 
-// write writes a message with the given message type and payload.
 func (c *Conn) write(mt int, payload []byte) error {
 	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.ws.WriteMessage(mt, payload)
 }
 
-// writePump pumps messages from the hub to the websocket connection.
-func (c *Conn) writePump() {
+func (c *Conn) writePump(command chan interface{}, leave chan bool) {
+	//groupReadMap := make(map[int64]int64)
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.ws.Close()
+		command <- connDel{conn: c}
 	}()
 	for {
 		select {
@@ -147,6 +141,8 @@ func (c *Conn) writePump() {
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}
+		case <-leave:
+			return
 		}
 	}
 }

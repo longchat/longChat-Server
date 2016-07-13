@@ -45,7 +45,6 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 	}
 	defer conn.Close()
 	client := protoc.NewMessageClient(conn)
-	fmt.Println(r.sChans, "  ", addr)
 	for data := range sCh {
 		fmt.Println("post data:", data)
 		reply, err := client.Message(context.Background(), &data)
@@ -113,7 +112,6 @@ func (r *Router) GroupUp(req *protoc.GroupUpReq) {
 		r.groups[req.GroupId] = groupWork
 		r.gLock.Unlock()
 	}
-	fmt.Println("group up:", r.groups)
 }
 
 func (r *Router) ServerUp(req *protoc.ServerUpReq) {

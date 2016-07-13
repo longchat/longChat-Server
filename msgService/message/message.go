@@ -99,13 +99,11 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	fmt.Println(id)
 	ws, err := m.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	conn := &Conn{send: make(chan *protoc.MessageReq, 128), ws: ws}
 	u, err := store.GetUserById(id.(int64))
 	if err != nil {
 		log.Println(err)
@@ -115,7 +113,5 @@ func (m *Messenger) ServeWs(w http.ResponseWriter, r *http.Request) {
 	for i := range u.JoinedGroups {
 		gids = append(gids, u.JoinedGroups[i].Id)
 	}
-	command <- connAdd{conn: conn, userId: u.Id, groupId: gids}
-	go conn.writePump()
-	conn.readPump(u.Id, gids)
+	command <- wsAdd{ws: ws, userId: u.Id, groupIds: gids}
 }
