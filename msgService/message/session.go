@@ -3,24 +3,29 @@ package message
 import (
 	"fmt"
 
+	"github.com/gorilla/websocket"
 	"github.com/longchat/longChat-Server/common/protoc"
 )
 
 type Session struct {
 	userId     int64
 	groupIds   []int64
-	conns      []*Conn
+	conns      []Conn
 	command    chan interface{}
 	send       chan *protoc.MessageReq
 	maxConnNum int
 }
 
+type groupReadMark struct {
+	groupRead map[int64]int64
+}
+
 type connAdd struct {
-	conn *Conn
+	ws *websocket.Conn
 }
 
 type connDel struct {
-	conn *Conn
+	connId int
 }
 
 func (s *Session) closeSess() {
@@ -28,11 +33,13 @@ func (s *Session) closeSess() {
 	close(s.command)
 }
 
-func (s *Session) startSession(conn *Conn, uid int64, gids []int64) {
+func (s *Session) startSession(ws *websocket.Conn, uid int64, gids []int64) {
+	conn := Conn{id: 0, session: s, ws: ws, send: make(chan *protoc.MessageReq, 128)}
+
 	s.conns = append(s.conns, conn)
 	s.userId = uid
 	s.groupIds = gids
-	s.command = make(chan interface{}, 2)
+	s.command = make(chan interface{}, 4)
 	s.send = make(chan *protoc.MessageReq, 200)
 	s.maxConnNum = 1
 	go conn.handleConn(s.command)
@@ -49,19 +56,24 @@ func (s *Session) handleSession() {
 			switch value := item.(type) {
 			case connAdd:
 				s.maxConnNum++
-				//max conn num
 				if len(s.conns) >= 4 {
 					continue
 				}
-				s.conns = append(s.conns, value.conn)
-				go value.conn.handleConn(s.command)
+				conn := Conn{id: len(s.conns), session: s, ws: value.ws, send: make(chan *protoc.MessageReq, 128)}
+				s.conns = append(s.conns, conn)
+				go conn.handleConn(s.command)
 			case connDel:
-				s.DelConn(value)
+				if s.DelConn(value) {
+					return
+				}
+			case groupReadMark:
+				fmt.Println("read mark:", value)
 			}
 		case message, isok := <-s.send:
 			if !isok {
 				return
 			}
+			//todo:if s.conns.send block here and the conn want to close it self by send command to session then it will be deadlock groutine
 			for i := range s.conns {
 				s.conns[i].send <- message
 			}
@@ -69,27 +81,20 @@ func (s *Session) handleSession() {
 	}
 }
 
-func (s *Session) DelConn(del connDel) {
-	del.conn.closeConn()
-	var i int
-	for i = range s.conns {
-		if s.conns[i].id == del.conn.id {
-			break
-		}
-	}
+func (s *Session) DelConn(del connDel) bool {
 	clen := len(s.conns)
-	if i == clen-1 && s.conns[i].id != del.conn.id {
-		panic(fmt.Sprintf("session's conns(%v) doesn't contain conn(%d)", s.conns, del.conn.id))
+	if del.connId >= clen {
+		panic(fmt.Sprintf("session's conns(%v) doesn't contain conn(%d)", s.conns, del.connId))
 	} else {
+		s.conns[del.connId].closeConn()
 		if clen == 1 {
 			command <- sessionDel{session: s, connsCount: s.maxConnNum}
 			s.conns = nil
-			fmt.Println("del session")
+			return true
 		} else {
-			copy(s.conns[i:clen-1], s.conns[i+1:clen])
+			copy(s.conns[del.connId:clen-1], s.conns[del.connId+1:clen])
 			s.conns = s.conns[:clen-1]
-			fmt.Println(s.conns)
-
 		}
 	}
+	return false
 }

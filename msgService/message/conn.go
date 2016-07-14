@@ -24,7 +24,7 @@ const (
 	pongWait = 60 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = ((pongWait * 2) / 10) + 6
+	pingPeriod = ((pongWait * 9) / 10) + 5
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 1024
@@ -82,11 +82,13 @@ func (c *Conn) write(mt int, payload []byte) error {
 }
 
 func (c *Conn) writePump(command chan interface{}, leave chan bool) {
-	//groupReadMap := make(map[int64]int64)
+	//key为groupid，value为lastreadid
+	groupReadMap := make(map[int64]int64, 6)
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		command <- connDel{conn: c}
+		command <- groupReadMark{groupRead: groupReadMap}
+		command <- connDel{connId: c.id}
 	}()
 	for {
 		select {
@@ -137,10 +139,14 @@ func (c *Conn) writePump(command chan interface{}, leave chan bool) {
 			if err := w.Close(); err != nil {
 				return
 			}
+			if message.GroupId > 0 {
+				groupReadMap[message.GroupId] = message.Id
+			}
 		case <-ticker.C:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}
+			command <- groupReadMark{groupRead: groupReadMap}
 		case <-leave:
 			return
 		}

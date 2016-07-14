@@ -26,7 +26,6 @@ type sessionDel struct {
 }
 
 func controller() {
-	connId := 0
 	connCount := 0
 	userSession = make(map[int64]*Session, 500)
 	groupUser = make(map[int64]map[int64]*Session, 100)
@@ -37,9 +36,8 @@ func controller() {
 		case item := <-command:
 			switch value := item.(type) {
 			case wsAdd:
-				connId++
 				connCount++
-				addWebsocket(value, connId)
+				addWebsocket(value)
 			case sessionDel:
 				connCount = connCount - value.connsCount
 				removeSession(value)
@@ -73,20 +71,16 @@ func removeSession(s sessionDel) {
 		}
 	}
 	delete(userSession, s.session.userId)
-	fmt.Println("removed:", groupUser)
-
 }
 
-func addWebsocket(s wsAdd, id int) {
+func addWebsocket(s wsAdd) {
 	session, isok := userSession[s.userId]
 	if !isok {
 		session = new(Session)
-		conn := Conn{id: id, session: session, ws: s.ws, send: make(chan *protoc.MessageReq, 128)}
-		session.startSession(&conn, s.userId, s.groupIds)
+		session.startSession(s.ws, s.userId, s.groupIds)
 		userSession[s.userId] = session
 	} else {
-		conn := Conn{id: id, session: session, ws: s.ws, send: make(chan *protoc.MessageReq, 128)}
-		session.command <- connAdd{conn: &conn}
+		session.command <- connAdd{ws: s.ws}
 	}
 	if !isok {
 		for _, data := range s.groupIds {
