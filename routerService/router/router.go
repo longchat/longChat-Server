@@ -21,23 +21,23 @@ type Router struct {
 	gLock  *sync.RWMutex
 	sLock  *sync.RWMutex
 	groups map[int64]groupworker
-	sChans map[string]chan protoc.MessageReq
+	sChans map[string]chan interface{}
 }
 
 type groupworker struct {
 	senders []string
-	mChan   chan protoc.MessageReq
+	mChan   chan *protoc.MessageReq
 }
 
 func (r *Router) Init() error {
 	r.gLock = new(sync.RWMutex)
 	r.sLock = new(sync.RWMutex)
 	r.groups = make(map[int64]groupworker, 200)
-	r.sChans = make(map[string]chan protoc.MessageReq, 5)
+	r.sChans = make(map[string]chan interface{}, 256)
 	return nil
 }
 
-func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
+func (r *Router) sender(addr string, sCh chan interface{}) error {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		log.ERROR.Printf("dial to MsgServer(%s) failed!err:=%s", addr, err)
@@ -46,8 +46,16 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 	defer conn.Close()
 	client := protoc.NewMessageClient(conn)
 	for data := range sCh {
-		fmt.Println("post data:", data)
-		reply, err := client.Message(context.Background(), &data)
+		var reply *protoc.BaseRsp
+		var err error
+		switch value := data.(type) {
+		case *protoc.MessageReq:
+			reply, err = client.Message(context.Background(), value)
+		case *protoc.UserUpReq:
+			reply, err = client.UserUp(context.Background(), value)
+		case *protoc.UserDownReq:
+			reply, err = client.UserDown(context.Background(), value)
+		}
 		if err != nil || reply.StatusCode != 0 {
 			if err == nil {
 				err = errors.New(reply.Err)
@@ -59,7 +67,7 @@ func (r *Router) sender(addr string, sCh chan protoc.MessageReq) error {
 	return nil
 }
 
-func (r *Router) groupFetcher(gId int64, gCh chan protoc.MessageReq) {
+func (r *Router) groupFetcher(gId int64, gCh chan *protoc.MessageReq) {
 	for msg := range gCh {
 		fmt.Println("Recevie msg", msg)
 		r.gLock.RLock()
@@ -84,17 +92,36 @@ func (r *Router) MessageIn(req *protoc.MessageReq) {
 	} else {
 		mCh := group.mChan
 		r.gLock.RUnlock()
-		mCh <- protoc.MessageReq{From: req.From, GroupId: req.GroupId, To: req.To, Content: req.Content, Type: req.Type}
+		mCh <- req
 	}
 }
 
+func (r *Router) UserUp(req *protoc.UserUpReq) {
+	r.sLock.RLock()
+	for k, v := range r.sChans {
+		if k != req.ServerAddr {
+			v <- req
+		}
+	}
+	r.sLock.RUnlock()
+}
+
+func (r *Router) UserDown(req *protoc.UserDownReq) {
+	r.sLock.RLock()
+	for k, v := range r.sChans {
+		if k != req.ServerAddr {
+			v <- req
+		}
+	}
+	r.sLock.RUnlock()
+}
+
 func (r *Router) GroupUp(req *protoc.GroupUpReq) {
-	fmt.Println("group up")
 	ip := req.ServerAddr
 	r.gLock.Lock()
 	groupWork, isok := r.groups[req.GroupId]
 	if !isok {
-		msgChan := make(chan protoc.MessageReq)
+		msgChan := make(chan *protoc.MessageReq)
 		senders := make([]string, 1)
 		senders[0] = ip
 		groupWork = groupworker{senders: senders, mChan: msgChan}
@@ -121,7 +148,7 @@ func (r *Router) ServerUp(req *protoc.ServerUpReq) {
 		r.sLock.Unlock()
 		return
 	}
-	chans := make(chan protoc.MessageReq, 1000)
+	chans := make(chan interface{}, 1000)
 	r.sChans[req.ServerAddr] = chans
 	r.sLock.Unlock()
 	go r.sender(req.ServerAddr, chans)

@@ -31,6 +31,16 @@ func (r *routerServer) ServerUp(ctx context.Context, in *protoc.ServerUpReq) (*p
 	return &protoc.BaseRsp{}, nil
 }
 
+func (r *routerServer) UserUp(ctx context.Context, in *protoc.UserUpReq) (*protoc.BaseRsp, error) {
+	r.router.UserUp(in)
+	return &protoc.BaseRsp{}, nil
+}
+
+func (r *routerServer) UserDown(ctx context.Context, in *protoc.UserDownReq) (*protoc.BaseRsp, error) {
+	r.router.UserDown(in)
+	return &protoc.BaseRsp{}, nil
+}
+
 func main() {
 	config.InitConfig()
 	routerSer := routerServer{router: &router.Router{}}

@@ -1,7 +1,6 @@
 package message
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -33,7 +32,7 @@ const (
 type Conn struct {
 	id      int
 	ws      *websocket.Conn
-	send    chan *protoc.MessageReq
+	send    chan interface{}
 	session *Session
 }
 
@@ -71,6 +70,8 @@ func (c *Conn) handleConn(command chan interface{}) {
 				fmt.Println("post message to server failed!err:=%v,err:=%v", err, reply.Err)
 				break
 			}
+		} else if data.GetHeader() == DataTypeGroupMemberList {
+
 		}
 	}
 	close(leave)
@@ -79,6 +80,27 @@ func (c *Conn) handleConn(command chan interface{}) {
 func (c *Conn) write(mt int, payload []byte) error {
 	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.ws.WriteMessage(mt, payload)
+}
+
+func packData(data interface{}) []byte {
+	var err error
+	var mbytes []byte
+	var md MessageData
+	switch value := data.(type) {
+	case *protoc.MessageReq:
+		var groupMsg DataGroupMessage = DataGroupMessage{
+			Id:      fmt.Sprintf("%d", value.Id),
+			From:    fmt.Sprintf("%d", value.From),
+			GroupId: fmt.Sprintf("%d", value.GroupId),
+			Content: value.Content,
+			Type:    value.Type,
+		}
+		mbytes, err = md.Serialize(DataTypeGroupMessage, &groupMsg)
+		if err != nil {
+			fmt.Println("marshal data failed!err:=%v", *value)
+		}
+	}
+	return mbytes
 }
 
 func (c *Conn) writePump(command chan interface{}, leave chan bool) {
@@ -104,43 +126,19 @@ func (c *Conn) writePump(command chan interface{}, leave chan bool) {
 			if err != nil {
 				return
 			}
-			var groupMsg DataGroupMessage = DataGroupMessage{
-				Id:      fmt.Sprintf("%d", message.Id),
-				From:    fmt.Sprintf("%d", message.From),
-				GroupId: fmt.Sprintf("%d", message.GroupId),
-				Content: message.Content,
-				Type:    message.Type,
-			}
-			mbytes, err := json.Marshal(&groupMsg)
-			if err != nil {
-				fmt.Println("marshal data failed!err:=%v", *message)
-			}
+			mbytes := packData(message)
 			w.Write(mbytes)
-
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
 				message = <-c.send
-				groupMsg = DataGroupMessage{
-					Id:      fmt.Sprintf("%d", message.Id),
-					From:    fmt.Sprintf("%d", message.From),
-					GroupId: fmt.Sprintf("%d", message.GroupId),
-					Content: message.Content,
-					Type:    message.Type,
-				}
-				mbytes, err := json.Marshal(&groupMsg)
-				if err != nil {
-					fmt.Println("marshal data failed!err:=%v", *message)
-				}
+				mbytes := packData(message)
 				w.Write(mbytes)
 			}
 
 			if err := w.Close(); err != nil {
 				return
-			}
-			if message.GroupId > 0 {
-				groupReadMap[message.GroupId] = message.Id
 			}
 		case <-ticker.C:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {

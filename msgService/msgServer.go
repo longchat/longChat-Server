@@ -23,6 +23,16 @@ func (ms *msgServer) Message(ctx context.Context, in *protoc.MessageReq) (*proto
 	return &protoc.BaseRsp{}, nil
 }
 
+func (ms *msgServer) UserUp(ctx context.Context, in *protoc.UserUpReq) (*protoc.BaseRsp, error) {
+	ms.msg.UserUp(in)
+	return &protoc.BaseRsp{}, nil
+}
+
+func (ms *msgServer) UserDown(ctx context.Context, in *protoc.UserDownReq) (*protoc.BaseRsp, error) {
+	ms.msg.UserDown(in)
+	return &protoc.BaseRsp{}, nil
+}
+
 func main() {
 	config.InitConfig()
 	addr, err := config.GetConfigString(consts.MsgServiceAddress)

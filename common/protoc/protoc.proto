@@ -4,9 +4,13 @@ package protoc;
 
 service Message {
   rpc Message (MessageReq) returns (BaseRsp) {}
+  rpc UserUp (UserUpReq) returns (BaseRsp) {}
+  rpc UserDown (UserDownReq) returns (BaseRsp) {}
 }
 
 service Router {
+  rpc UserUp (UserUpReq) returns (BaseRsp) {}
+  rpc UserDown (UserDownReq) returns (BaseRsp) {}
   rpc GroupUp (GroupUpReq) returns (BaseRsp) {}
   rpc ServerUp (ServerUpReq) returns (BaseRsp) {}
   rpc Message (MessageReq) returns (BaseRsp) {}
@@ -35,4 +39,13 @@ message ServerUpReq{
 	string ServerAddr=1;
 }
 
+message UserUpReq{
+	int64 	UserId=1;
+	string ServerAddr=2;
+}
+
+message UserDownReq{
+	int64 	UserId=1;
+	string ServerAddr=2;
+}
 

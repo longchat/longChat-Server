@@ -13,6 +13,8 @@ It has these top-level messages:
 	GroupUpReq
 	MessageReq
 	ServerUpReq
+	UserUpReq
+	UserDownReq
 */
 package protoc
 
@@ -79,11 +81,33 @@ func (m *ServerUpReq) String() string            { return proto.CompactTextStrin
 func (*ServerUpReq) ProtoMessage()               {}
 func (*ServerUpReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
+type UserUpReq struct {
+	UserId     int64  `protobuf:"varint,1,opt,name=UserId,json=userId" json:"UserId,omitempty"`
+	ServerAddr string `protobuf:"bytes,2,opt,name=ServerAddr,json=serverAddr" json:"ServerAddr,omitempty"`
+}
+
+func (m *UserUpReq) Reset()                    { *m = UserUpReq{} }
+func (m *UserUpReq) String() string            { return proto.CompactTextString(m) }
+func (*UserUpReq) ProtoMessage()               {}
+func (*UserUpReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+
+type UserDownReq struct {
+	UserId     int64  `protobuf:"varint,1,opt,name=UserId,json=userId" json:"UserId,omitempty"`
+	ServerAddr string `protobuf:"bytes,2,opt,name=ServerAddr,json=serverAddr" json:"ServerAddr,omitempty"`
+}
+
+func (m *UserDownReq) Reset()                    { *m = UserDownReq{} }
+func (m *UserDownReq) String() string            { return proto.CompactTextString(m) }
+func (*UserDownReq) ProtoMessage()               {}
+func (*UserDownReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
 func init() {
 	proto.RegisterType((*BaseRsp)(nil), "protoc.BaseRsp")
 	proto.RegisterType((*GroupUpReq)(nil), "protoc.GroupUpReq")
 	proto.RegisterType((*MessageReq)(nil), "protoc.MessageReq")
 	proto.RegisterType((*ServerUpReq)(nil), "protoc.ServerUpReq")
+	proto.RegisterType((*UserUpReq)(nil), "protoc.UserUpReq")
+	proto.RegisterType((*UserDownReq)(nil), "protoc.UserDownReq")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -98,6 +122,8 @@ const _ = grpc.SupportPackageIsVersion3
 
 type MessageClient interface {
 	Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*BaseRsp, error)
+	UserUp(ctx context.Context, in *UserUpReq, opts ...grpc.CallOption) (*BaseRsp, error)
+	UserDown(ctx context.Context, in *UserDownReq, opts ...grpc.CallOption) (*BaseRsp, error)
 }
 
 type messageClient struct {
@@ -117,10 +143,30 @@ func (c *messageClient) Message(ctx context.Context, in *MessageReq, opts ...grp
 	return out, nil
 }
 
+func (c *messageClient) UserUp(ctx context.Context, in *UserUpReq, opts ...grpc.CallOption) (*BaseRsp, error) {
+	out := new(BaseRsp)
+	err := grpc.Invoke(ctx, "/protoc.Message/UserUp", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *messageClient) UserDown(ctx context.Context, in *UserDownReq, opts ...grpc.CallOption) (*BaseRsp, error) {
+	out := new(BaseRsp)
+	err := grpc.Invoke(ctx, "/protoc.Message/UserDown", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Message service
 
 type MessageServer interface {
 	Message(context.Context, *MessageReq) (*BaseRsp, error)
+	UserUp(context.Context, *UserUpReq) (*BaseRsp, error)
+	UserDown(context.Context, *UserDownReq) (*BaseRsp, error)
 }
 
 func RegisterMessageServer(s *grpc.Server, srv MessageServer) {
@@ -145,6 +191,42 @@ func _Message_Message_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Message_UserUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserUpReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageServer).UserUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protoc.Message/UserUp",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageServer).UserUp(ctx, req.(*UserUpReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Message_UserDown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDownReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageServer).UserDown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protoc.Message/UserDown",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageServer).UserDown(ctx, req.(*UserDownReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Message_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "protoc.Message",
 	HandlerType: (*MessageServer)(nil),
@@ -152,6 +234,14 @@ var _Message_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Message",
 			Handler:    _Message_Message_Handler,
+		},
+		{
+			MethodName: "UserUp",
+			Handler:    _Message_UserUp_Handler,
+		},
+		{
+			MethodName: "UserDown",
+			Handler:    _Message_UserDown_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -161,6 +251,8 @@ var _Message_serviceDesc = grpc.ServiceDesc{
 // Client API for Router service
 
 type RouterClient interface {
+	UserUp(ctx context.Context, in *UserUpReq, opts ...grpc.CallOption) (*BaseRsp, error)
+	UserDown(ctx context.Context, in *UserDownReq, opts ...grpc.CallOption) (*BaseRsp, error)
 	GroupUp(ctx context.Context, in *GroupUpReq, opts ...grpc.CallOption) (*BaseRsp, error)
 	ServerUp(ctx context.Context, in *ServerUpReq, opts ...grpc.CallOption) (*BaseRsp, error)
 	Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*BaseRsp, error)
@@ -172,6 +264,24 @@ type routerClient struct {
 
 func NewRouterClient(cc *grpc.ClientConn) RouterClient {
 	return &routerClient{cc}
+}
+
+func (c *routerClient) UserUp(ctx context.Context, in *UserUpReq, opts ...grpc.CallOption) (*BaseRsp, error) {
+	out := new(BaseRsp)
+	err := grpc.Invoke(ctx, "/protoc.Router/UserUp", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *routerClient) UserDown(ctx context.Context, in *UserDownReq, opts ...grpc.CallOption) (*BaseRsp, error) {
+	out := new(BaseRsp)
+	err := grpc.Invoke(ctx, "/protoc.Router/UserDown", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *routerClient) GroupUp(ctx context.Context, in *GroupUpReq, opts ...grpc.CallOption) (*BaseRsp, error) {
@@ -204,6 +314,8 @@ func (c *routerClient) Message(ctx context.Context, in *MessageReq, opts ...grpc
 // Server API for Router service
 
 type RouterServer interface {
+	UserUp(context.Context, *UserUpReq) (*BaseRsp, error)
+	UserDown(context.Context, *UserDownReq) (*BaseRsp, error)
 	GroupUp(context.Context, *GroupUpReq) (*BaseRsp, error)
 	ServerUp(context.Context, *ServerUpReq) (*BaseRsp, error)
 	Message(context.Context, *MessageReq) (*BaseRsp, error)
@@ -211,6 +323,42 @@ type RouterServer interface {
 
 func RegisterRouterServer(s *grpc.Server, srv RouterServer) {
 	s.RegisterService(&_Router_serviceDesc, srv)
+}
+
+func _Router_UserUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserUpReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServer).UserUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protoc.Router/UserUp",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServer).UserUp(ctx, req.(*UserUpReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Router_UserDown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDownReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RouterServer).UserDown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protoc.Router/UserDown",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RouterServer).UserDown(ctx, req.(*UserDownReq))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Router_GroupUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -272,6 +420,14 @@ var _Router_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*RouterServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "UserUp",
+			Handler:    _Router_UserUp_Handler,
+		},
+		{
+			MethodName: "UserDown",
+			Handler:    _Router_UserDown_Handler,
+		},
+		{
 			MethodName: "GroupUp",
 			Handler:    _Router_GroupUp_Handler,
 		},
@@ -291,24 +447,27 @@ var _Router_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("protoc.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 294 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x92, 0xb1, 0x4e, 0xc3, 0x30,
-	0x10, 0x86, 0x49, 0x13, 0x12, 0x38, 0x10, 0xa0, 0x63, 0xb1, 0x18, 0x10, 0xca, 0xc4, 0x42, 0x85,
-	0xc2, 0xc8, 0x04, 0x15, 0x45, 0x0c, 0x2c, 0xa6, 0x3c, 0x40, 0x68, 0x8e, 0x8a, 0x81, 0x3a, 0x9c,
-	0x1d, 0x24, 0xde, 0x80, 0xc7, 0xe0, 0x51, 0x71, 0x6c, 0x27, 0x69, 0x51, 0x17, 0xa6, 0xdc, 0x9d,
-	0xfd, 0xff, 0xf9, 0xee, 0x97, 0x61, 0xbf, 0x66, 0x65, 0xd4, 0x7c, 0xec, 0x3e, 0x98, 0xfa, 0x2e,
-	0xbf, 0x86, 0xec, 0xb6, 0xd4, 0x24, 0x75, 0x8d, 0xa7, 0x00, 0x4f, 0xa6, 0x34, 0x8d, 0x9e, 0xa8,
-	0x8a, 0x44, 0x74, 0x16, 0x9d, 0xc7, 0x12, 0x74, 0x3f, 0xc1, 0x23, 0x88, 0xef, 0x98, 0xc5, 0xc8,
-	0x1e, 0xec, 0xca, 0x98, 0x98, 0xf3, 0x29, 0xc0, 0x3d, 0xab, 0xa6, 0x7e, 0xae, 0x25, 0x7d, 0xa0,
-	0x80, 0xcc, 0x75, 0x0f, 0x55, 0x10, 0x67, 0x0b, 0xdf, 0x3a, 0x67, 0xe2, 0x4f, 0xe2, 0x9b, 0xaa,
-	0xea, 0x0c, 0x40, 0xf7, 0x93, 0xfc, 0x3b, 0x02, 0x78, 0x24, 0xad, 0xcb, 0x05, 0xb5, 0x46, 0x07,
-	0x30, 0xea, 0x3d, 0x46, 0x6f, 0x15, 0x22, 0x24, 0x53, 0x56, 0xef, 0x4e, 0x18, 0xcb, 0xe4, 0xd5,
-	0xd6, 0xed, 0x9d, 0x99, 0x12, 0xb1, 0xbf, 0x63, 0xf7, 0xb1, 0x3f, 0x9f, 0xa8, 0xa5, 0xa1, 0xa5,
-	0x11, 0x89, 0xf3, 0xcf, 0xe6, 0xbe, 0x6d, 0xd5, 0xb3, 0xaf, 0x9a, 0xc4, 0xb6, 0x1b, 0x27, 0xc6,
-	0xd6, 0xab, 0xa8, 0xe9, 0x1a, 0x6a, 0x7e, 0x01, 0x7b, 0x1e, 0xd5, 0xef, 0xb4, 0x4e, 0x1e, 0xfd,
-	0x25, 0x2f, 0x6c, 0x7c, 0x01, 0x1c, 0x2f, 0x87, 0x12, 0xc7, 0x21, 0xeb, 0x61, 0xa9, 0x93, 0xc3,
-	0x6e, 0x16, 0xe2, 0xce, 0xb7, 0x8a, 0x9f, 0x08, 0x52, 0xa9, 0x1a, 0x43, 0xdc, 0x8a, 0x43, 0x92,
-	0x83, 0x78, 0x88, 0x76, 0x83, 0x18, 0x0b, 0xd8, 0xe9, 0x40, 0xf1, 0xb8, 0x3b, 0x5e, 0x41, 0xdf,
-	0xa4, 0xf9, 0x37, 0xe2, 0x8b, 0x7f, 0x26, 0x57, 0xbf, 0x01, 0x00, 0x00, 0xff, 0xff, 0xb7, 0x5a,
-	0x47, 0x92, 0x3d, 0x02, 0x00, 0x00,
+	// 350 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xbc, 0x53, 0x3b, 0x4f, 0xc3, 0x30,
+	0x10, 0x26, 0x0f, 0x12, 0x7a, 0x45, 0x3c, 0x8c, 0x84, 0x2c, 0x06, 0x84, 0x32, 0xb1, 0x50, 0xa1,
+	0x32, 0x32, 0x41, 0x69, 0x11, 0x03, 0x8b, 0x69, 0x7f, 0x40, 0x69, 0x4c, 0xc5, 0x40, 0x6c, 0x6c,
+	0x07, 0xc4, 0xce, 0xc0, 0xbf, 0xe0, 0xaf, 0x12, 0xbf, 0x92, 0x54, 0xb4, 0x42, 0x08, 0x89, 0x29,
+	0xbe, 0xf3, 0x7d, 0x8f, 0x3b, 0x5f, 0x60, 0x93, 0x0b, 0xa6, 0xd8, 0xac, 0x67, 0x3e, 0x28, 0xb1,
+	0x51, 0x76, 0x0e, 0xe9, 0xe5, 0x54, 0x52, 0x22, 0x39, 0x3a, 0x04, 0xb8, 0x53, 0x53, 0x55, 0xca,
+	0x01, 0xcb, 0x29, 0x0e, 0x8e, 0x82, 0xe3, 0x88, 0x80, 0xac, 0x33, 0x68, 0x07, 0xa2, 0xa1, 0x10,
+	0x38, 0xac, 0x2e, 0x3a, 0x24, 0xa2, 0x42, 0x64, 0x23, 0x80, 0x6b, 0xc1, 0x4a, 0x3e, 0xe1, 0x84,
+	0x3e, 0x23, 0x0c, 0xa9, 0x89, 0x6e, 0x72, 0x07, 0x4e, 0xe7, 0x36, 0x34, 0xcc, 0x54, 0xbc, 0x50,
+	0x71, 0x91, 0xe7, 0x9e, 0x00, 0x64, 0x9d, 0xc9, 0x3e, 0x02, 0x80, 0x5b, 0x2a, 0xe5, 0x74, 0x4e,
+	0x35, 0xd1, 0x16, 0x84, 0x35, 0x47, 0xf8, 0x98, 0x23, 0x04, 0xf1, 0x48, 0xb0, 0x27, 0x03, 0x8c,
+	0x48, 0xfc, 0x50, 0x9d, 0x75, 0xcd, 0x98, 0xe1, 0xc8, 0xd6, 0x54, 0xfd, 0x54, 0xe2, 0x03, 0x56,
+	0x28, 0x5a, 0x28, 0x1c, 0x1b, 0xfe, 0x74, 0x66, 0x43, 0x8d, 0x1e, 0xbf, 0x71, 0x8a, 0xd7, 0x4d,
+	0x3a, 0x56, 0xd5, 0xb9, 0x6d, 0x35, 0x59, 0xb0, 0x9a, 0x9d, 0x40, 0xd7, 0x5a, 0xb5, 0x3d, 0x2d,
+	0x3a, 0x0f, 0xbe, 0x39, 0x1f, 0x40, 0x67, 0x22, 0x7d, 0xf1, 0x3e, 0x24, 0x3a, 0xa8, 0xbd, 0x27,
+	0xa5, 0x89, 0x7e, 0x6c, 0x7f, 0x08, 0x5d, 0x8d, 0xbb, 0x62, 0xaf, 0xc5, 0x1f, 0x68, 0xfa, 0x9f,
+	0x01, 0xa4, 0x6e, 0x8a, 0xe8, 0xb4, 0x39, 0xa2, 0x9e, 0x7b, 0xf8, 0x66, 0xc2, 0x07, 0xdb, 0x3e,
+	0xe7, 0xde, 0x3e, 0x5b, 0x43, 0x3d, 0xab, 0x3a, 0xe1, 0x68, 0xd7, 0x5f, 0xd6, 0x9d, 0x2d, 0xab,
+	0xef, 0xc3, 0x86, 0x37, 0x8d, 0xf6, 0xda, 0x08, 0xd7, 0xc6, 0x12, 0x4c, 0xff, 0x3d, 0x84, 0x84,
+	0xb0, 0x52, 0x51, 0xf1, 0x1f, 0x72, 0x7a, 0x08, 0x6e, 0x3d, 0x9b, 0x21, 0x34, 0xfb, 0xba, 0x42,
+	0xc5, 0xbf, 0x7e, 0xa3, 0xd2, 0xda, 0x87, 0x15, 0x2a, 0xbf, 0x1b, 0xf5, 0xbd, 0xfd, 0xf7, 0xce,
+	0xbe, 0x02, 0x00, 0x00, 0xff, 0xff, 0xb1, 0x13, 0xde, 0x18, 0x92, 0x03, 0x00, 0x00,
 }

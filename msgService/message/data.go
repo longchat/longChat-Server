@@ -12,17 +12,11 @@ type MessageData struct {
 type DataType byte
 
 const (
-	DataTypeLogin        DataType = 48
-	DataTypeUserMessage  DataType = 49
-	DataTypeGroupMessage DataType = 50
-	DataTypeLogout       DataType = 51
-	DataTypeKickOut      DataType = 52
-	DataTypeInvalidType  DataType = 127
+	DataTypeUserMessage     DataType = 49
+	DataTypeGroupMessage    DataType = 50
+	DataTypeGroupMemberList DataType = 51
+	DataTypeInvalidType     DataType = 126
 )
-
-type DataLogin struct {
-	Token string
-}
 
 type DataUserMessage struct {
 	Id      string
@@ -37,6 +31,17 @@ type DataGroupMessage struct {
 	From    string
 	GroupId string
 	Content string
+	Type    string
+}
+
+type DataGroupMembers struct {
+	GroupId int64
+	UserIds []string
+}
+
+type DataGroupMemberUpdate struct {
+	UserId  string
+	GroupId string
 	Type    string
 }
 
