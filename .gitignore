@@ -7,4 +7,5 @@ routerService/routerService
 storageService/storageService
 logs/
 config.cfg
+config2.cfg
 longChat-Server

@@ -52,7 +52,6 @@ func (c *Conn) handleConn(command chan interface{}) {
 	go c.writePump(command, leave)
 	for {
 		_, message, err := c.ws.ReadMessage()
-		fmt.Println("read msg(%s)err:=%v", string(message), err)
 		if err != nil {
 			break
 		}
@@ -70,8 +69,18 @@ func (c *Conn) handleConn(command chan interface{}) {
 				fmt.Println("post message to server failed!err:=%v,err:=%v", err, reply.Err)
 				break
 			}
-		} else if data.GetHeader() == DataTypeGroupMemberList {
-
+		} else if data.GetHeader() == DataTypeUserMessage {
+			var msg DataUserMessage
+			err := data.GetData(&msg)
+			if err != nil {
+				fmt.Println("unmarshall data(%s) failed!", string(message))
+				break
+			}
+			to, err := strconv.ParseInt(msg.To, 10, 64)
+			if err != nil {
+				continue
+			}
+			msgChan <- &protoc.MessageReq{Id: time.Now().UnixNano(), From: c.session.userId, To: to, Content: msg.Content, Type: msg.Type}
 		}
 	}
 	close(leave)
@@ -96,6 +105,15 @@ func packData(data interface{}) []byte {
 			Type:    value.Type,
 		}
 		mbytes, err = md.Serialize(DataTypeGroupMessage, &groupMsg)
+		if err != nil {
+			fmt.Println("marshal data failed!err:=%v", *value)
+		}
+	case *getGroupMembers:
+		var groupMember DataGroupMembers = DataGroupMembers{
+			GroupId: value.groupId,
+			UserIds: value.userIds,
+		}
+		mbytes, err = md.Serialize(DataTypeGroupMemberList, &groupMember)
 		if err != nil {
 			fmt.Println("marshal data failed!err:=%v", *value)
 		}

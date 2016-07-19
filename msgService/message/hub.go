@@ -48,8 +48,13 @@ type getGroupMembers struct {
 	userIds []string
 }
 
+type chatGroup struct {
+	users       map[int64]*Session
+	isPublished bool
+}
+
 //若该用户在本地则session不为nil
-var groups map[int64]map[int64]*Session
+var groups map[int64]chatGroup
 var users map[int64]userState
 var command chan interface{}
 
@@ -60,8 +65,8 @@ func controller() {
 	connCount := 0
 	msgServer = make(map[string]chan *protoc.MessageReq, 8)
 	users = make(map[int64]userState, 1000)
-	groups = make(map[int64]map[int64]*Session, 100)
-	command = make(chan interface{})
+	groups = make(map[int64]chatGroup, 100)
+	command = make(chan interface{}, 100)
 	msgChan = make(chan *protoc.MessageReq, 800)
 	for {
 		select {
@@ -83,7 +88,7 @@ func controller() {
 				groupUsers, isok := groups[value.groupId]
 				if isok {
 					ids := make([]string, 0, 100)
-					for k, _ := range groupUsers {
+					for k, _ := range groupUsers.users {
 						ids = append(ids, fmt.Sprintf("%d", k))
 					}
 					value.userIds = ids
@@ -119,7 +124,7 @@ func processMessage(msg *protoc.MessageReq) {
 	if msg.GroupId > 0 {
 		usersess, isok := groups[msg.GroupId]
 		if isok {
-			for _, v := range usersess {
+			for _, v := range usersess.users {
 				if v != nil {
 					v.send <- msg
 				}
@@ -130,6 +135,8 @@ func processMessage(msg *protoc.MessageReq) {
 		if isok {
 			if userState.session == nil {
 				serverCh, isok := msgServer[userState.serverAddress]
+				fmt.Println("userstate:", userState, "serverch:", serverCh)
+
 				if isok {
 					serverCh <- msg
 				} else {
@@ -146,8 +153,8 @@ func removeSession(s sessionDel) {
 	s.session.closeSess()
 	for _, data := range s.session.groupIds {
 		group, _ := groups[data]
-		delete(group, s.session.userId)
-		if len(group) == 0 {
+		delete(group.users, s.session.userId)
+		if len(group.users) == 0 {
 			delete(groups, data)
 		} else {
 			groups[data] = group
@@ -164,7 +171,7 @@ func removeUser(ru userRemove) {
 	for _, data := range state.gids {
 		groupUsers, isok := groups[data]
 		if isok {
-			delete(groupUsers, ru.userId)
+			delete(groupUsers.users, ru.userId)
 		}
 	}
 	delete(users, ru.userId)
@@ -185,9 +192,9 @@ func addUser(usa userAdd) {
 		for _, data := range usa.gids {
 			groupUsers, isok := groups[data]
 			if !isok {
-				groupUsers = make(map[int64]*Session, 100)
+				groupUsers.users = make(map[int64]*Session, 100)
 			} else {
-				groupUsers[usa.userId] = nil
+				groupUsers.users[usa.userId] = nil
 			}
 			groups[data] = groupUsers
 		}
@@ -214,13 +221,18 @@ func addWebsocket(s wsAdd) {
 		for _, data := range s.groupIds {
 			group, isok := groups[data]
 			if !isok {
-				group = make(map[int64]*Session, 20)
+				group.users = make(map[int64]*Session, 20)
+				reply, err := router.GroupUp(context.Background(), &protoc.GroupUpReq{GroupId: data, ServerAddr: msgAddr})
+				if err != nil || reply.StatusCode != 0 {
+					fmt.Printf("group up to router failed!err:=%v,err:=%v", err, reply.Err)
+				}
+			} else if !group.isPublished {
 				reply, err := router.GroupUp(context.Background(), &protoc.GroupUpReq{GroupId: data, ServerAddr: msgAddr})
 				if err != nil || reply.StatusCode != 0 {
 					fmt.Printf("group up to router failed!err:=%v,err:=%v", err, reply.Err)
 				}
 			}
-			group[s.userId] = state.session
+			group.users[s.userId] = state.session
 			groups[data] = group
 		}
 	}

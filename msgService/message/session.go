@@ -67,6 +67,7 @@ func (s *Session) handleSession() {
 				conn := Conn{id: len(s.conns), session: s, ws: value.ws, send: make(chan interface{}, 128)}
 				s.conns = append(s.conns, conn)
 				go conn.handleConn(s.command)
+				command <- getGroupMembers{connId: conn.id, session: s, groupId: s.activeGroupId}
 			case connDel:
 				if s.DelConn(value) {
 					return

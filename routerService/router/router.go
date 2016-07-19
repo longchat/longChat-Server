@@ -2,7 +2,6 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -69,7 +68,6 @@ func (r *Router) sender(addr string, sCh chan interface{}) error {
 
 func (r *Router) groupFetcher(gId int64, gCh chan *protoc.MessageReq) {
 	for msg := range gCh {
-		fmt.Println("Recevie msg", msg)
 		r.gLock.RLock()
 		group := r.groups[gId]
 		r.gLock.RUnlock()
