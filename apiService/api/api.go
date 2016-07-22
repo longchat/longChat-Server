@@ -4,9 +4,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/iris-contrib/sessiondb/redis"
+	"github.com/iris-contrib/sessiondb/redis/service"
 	"github.com/kataras/iris"
 	iconfig "github.com/kataras/iris/config"
-	"github.com/kataras/iris/sessions/providers/redis"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/idService/generator"
@@ -14,8 +15,7 @@ import (
 )
 
 func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storage.Storage) {
-	framework.Config.Render.Rest.Gzip = true
-	framework.Config.Render.Template.Gzip = true
+	framework.Config.Gzip = true
 
 	redisAddr, err := config.GetConfigString(consts.RedisAddress)
 	if err != nil {
@@ -34,15 +34,21 @@ func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storag
 		log.Fatalf(consts.ErrGetConfigFailed(consts.SessionCookieName, err))
 	}
 	framework.Config.Sessions = iconfig.Sessions{
-		Provider:   "redis",
 		Cookie:     cookie,
-		Expires:    iconfig.CookieExpireNever,
 		GcDuration: time.Duration(2) * time.Hour,
 	}
-	redis.Config.Network = "tcp"
-	redis.Config.Addr = redisAddr
-	redis.Config.Prefix = redisPrefix
-	redis.Config.Password = redisPsw
+
+	db := redis.New(service.Config{Network: service.DefaultRedisNetwork,
+		Addr:          redisAddr,
+		Password:      redisPsw,
+		Database:      "0",
+		MaxIdle:       4,
+		MaxActive:     4,
+		IdleTimeout:   service.DefaultRedisIdleTimeout,
+		Prefix:        redisPrefix,
+		MaxAgeSeconds: service.DefaultRedisMaxAgeSeconds}) // optionally configure the bridge between your redis server
+
+	framework.UseSessionDB(db)
 
 	ua := UserApi{idGen: idGen, store: store}
 	ua.RegisterRoute(framework)

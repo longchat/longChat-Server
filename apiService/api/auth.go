@@ -56,13 +56,8 @@ func (au *AuthApi) login(c *iris.Context) {
 		c.JSON(http.StatusUnauthorized, dto.PasswordNotMatchErrRsp())
 		return
 	}
+	c.Session().Set("Id", user.Id)
 
-	err = c.Session().Set("Id", user.Id)
-	if err != nil {
-		log.ERROR.Printf("get session from redis failed!err:=%v\n", err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
-		return
-	}
 	var userDto dto.UserInfo
 	userDto.Id = fmt.Sprintf("%d", user.Id)
 	userDto.Avatar = user.Avatar
