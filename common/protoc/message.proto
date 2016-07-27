@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package protoc;
+
+message MessageReq {
+    message  Message {
+   	int64 Id=1;
+   	int64 From=2;
+    	int64 To=3;
+	string Content=4;
+	enum ContentType {
+	   Text = 0;
+    	   Pic = 1;
+    	   Emotion = 2;
+    	   Voice = 3;
+	}
+	ContentType Type=5;
+	bool IsGroupMessage=6;
+    }
+    repeated Message Messages = 1;
+}
+
+message UserReq{
+    message  User {
+   	int64  UserId=1;
+	bool IsOnline=2;
+    }
+    repeated User Users = 1;
+}
+
+message GroupReq{
+    message  Group {
+   	int64  GroupId=1;
+	bool IsOnline=2;
+    }
+    repeated Group Groups = 1;
+}
