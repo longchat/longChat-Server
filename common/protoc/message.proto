@@ -20,18 +20,11 @@ message MessageReq {
     repeated Message Messages = 1;
 }
 
-message UserReq{
-    message  User {
-   	int64  UserId=1;
-	bool IsOnline=2;
+message OnlineReq{
+    message  Item {
+   	int64  Id=1;
+	bool   IsOnline=2;
+	bool   IsGroup=3;
     }
-    repeated User Users = 1;
-}
-
-message GroupReq{
-    message  Group {
-   	int64  GroupId=1;
-	bool IsOnline=2;
-    }
-    repeated Group Groups = 1;
+    repeated Item Items = 1;
 }
