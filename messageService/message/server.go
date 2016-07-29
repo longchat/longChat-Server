@@ -1,6 +1,8 @@
 package message
 
 import (
+	slog "log"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -18,18 +20,19 @@ type Server struct {
 }
 
 var (
-	IsLeafServer bool
-	cookieName   string
-	redisPrefix  string
+	hasParentServer bool
+	isLeafServer    bool
+	cookieName      string
+	redisPrefix     string
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func startServer() {
-	msgCh = make(chan *messagepb.MessageReq, 256)
-	if IsLeafServer {
+func StartServer() {
+	msgCh = make(chan message, 256)
+	if isLeafServer {
 		onlineCh = make(chan online, 128)
 	} else {
 		rmConnCh = make(chan removeConn)
@@ -42,11 +45,37 @@ func startServer() {
 			},
 		},
 	}
+	if hasParentServer {
+		s.connectParentAndStartHub("127.0.0.1")
+	} else {
+		go startHub(nil)
+	}
+	http.HandleFunc("/websocket", s.ServeWebSocket)
+}
 
+func (s *Server) connectParentAndStartHub(addr string) {
+	rawC, err := net.Dial("tcp4", addr)
+	if err != nil {
+		slog.Fatalln("tcp dial to parent server failed", err)
+	}
+	urlA := url.URL{
+		Scheme: "ws",
+		Host:   addr,
+		Path:   "websocket",
+	}
+	header := http.Header(make(map[string][]string))
+	ws, _, err := websocket.NewClient(rawC, &urlA, header, 4096, 4096)
+	if err != nil {
+		slog.Fatalln("can't create websocket connect to parent server!", err)
+	}
+	wsConn := s.getWsConn(ws)
+	defer s.releaseWsConn(wsConn)
+	go startHub(wsConn)
+	wsConn.readPump()
 }
 
 func (s *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
-	if IsLeafServer {
+	if isLeafServer {
 		s.serveLeaf(w, r)
 	} else {
 		s.serveNode(w, r)
@@ -54,15 +83,16 @@ func (s *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveNode(w http.ResponseWriter, r *http.Request) {
-	wsConn, err := s.getWsConn(w, r)
+	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return
 	}
+	wsConn := s.getWsConn(ws)
+	defer s.releaseWsConn(wsConn)
 	wsConn.readPump()
 	rmConnCh <- removeConn{wsConn}
-	s.releaseWsConn(wsConn)
 }
 
 func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
@@ -116,34 +146,31 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 			IsGroup:  true,
 		})
 	}
-	req := &messagepb.OnlineReq{olItems}
-	wsConn, err := s.getWsConn(w, r)
+	req := messagepb.OnlineReq{olItems}
+	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return
 	}
+	wsConn := s.getWsConn(ws)
+	defer s.releaseWsConn(wsConn)
 	onlineCh <- online{wsConn, req}
 	wsConn.readPump()
 	for i := range req.Items {
 		req.Items[i].IsOnline = false
 	}
 	onlineCh <- online{wsConn, req}
-	s.releaseWsConn(wsConn)
 }
 
-func (s *Server) getWsConn(w http.ResponseWriter, r *http.Request) (*conn, error) {
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		return nil, err
-	}
+func (s *Server) getWsConn(ws *websocket.Conn) *conn {
 	wsConn := s.connPool.Get().(*conn)
 	wsConn.ws = ws
 	wsConn.Id = atomic.AddUint32(&s.maxConnId, 1)
 	wsConn.wLock.Lock()
 	wsConn.state = ConnStateWorking
 	wsConn.wLock.Unlock()
-	return wsConn, nil
+	return wsConn
 }
 
 func (s *Server) releaseWsConn(wsConn *conn) {

@@ -1,19 +1,36 @@
 package message
 
 import (
+	"fmt"
+	"time"
+
 	messagepb "github.com/longchat/longChat-Server/common/protoc"
 )
 
+const (
+	ForceFlushMessageCount uint32        = 256
+	JobFlushInterval       time.Duration = time.Millisecond * 5
+)
+
 type hubCenter struct {
-	wp *workerPool
+	parentJob job
+	wp        *workerPool
 	//优先user上线，再group上线
 	userMap  map[int64]*conn
 	groupMap map[int64]map[uint32]*conn
+
+	jobs         map[uint32]job
+	messageCount uint32
+}
+
+type message struct {
+	messageReq messagepb.MessageReq
+	wsConn     *conn
 }
 
 type online struct {
-	wsConn *conn
-	online *messagepb.OnlineReq
+	wsConn    *conn
+	onlineReq messagepb.OnlineReq
 }
 
 type removeConn struct {
@@ -21,49 +38,117 @@ type removeConn struct {
 }
 
 var (
-	msgCh    chan *messagepb.MessageReq
+	msgCh    chan message
 	onlineCh chan online
 	rmConnCh chan removeConn
 )
 
-func startHub() {
+func startHub(parentConn *conn) {
 	hub := hubCenter{
-		userMap:  make(map[int64]*conn, 512),
+		parentJob: job{
+			wsConn: parentConn,
+		},
+		userMap:  make(map[int64]*conn, 1024),
 		groupMap: make(map[int64]map[uint32]*conn, 128),
 		wp:       newWorkerPool(),
+		jobs:     make(map[uint32]job, 128),
 	}
 	go hub.hub()
-	go hub.controller()
 }
 
 func (hub *hubCenter) hub() {
+	tickCh := time.Tick(JobFlushInterval)
 	for {
 		select {
 		case msg := <-msgCh:
-			l := len(msgCh)
-			if l > 0 {
-				for i := 0; i < l; i++ {
-					msg2 := <-msgCh
-					msg.Messages = append(msg.Messages, msg2.Messages...)
-				}
-			}
 			hub.processMessage(msg)
 		case online := <-onlineCh:
 			hub.handleOnline(online)
 		case rm := <-rmConnCh:
+			hub.removeConn(rm)
+		case _ = <-tickCh:
+			hub.dispatchJobs()
 		}
 	}
 }
 
-func (hub *hubCenter) controller() {
-
+func (hub *hubCenter) removeConn(rmConn removeConn) {
+	for k, v := range hub.userMap {
+		if v.Id == rmConn.wsConn.Id {
+			delete(hub.userMap, k)
+			if hasParentServer {
+				hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, &messagepb.OnlineReq_Item{
+					Id:       k,
+					IsGroup:  false,
+					IsOnline: false,
+				})
+				hub.messageCount++
+			}
+		}
+	}
+	for k, v := range hub.groupMap {
+		for k2, v2 := range v {
+			if v2.Id == rmConn.wsConn.Id {
+				delete(v, k2)
+				if len(v) == 0 {
+					delete(hub.groupMap, k)
+					if hasParentServer {
+						hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, &messagepb.OnlineReq_Item{
+							Id:       k,
+							IsGroup:  true,
+							IsOnline: false,
+						})
+						hub.messageCount++
+					}
+				} else {
+					hub.groupMap[k] = v
+				}
+				break
+			}
+		}
+	}
+	if hub.messageCount >= ForceFlushMessageCount {
+		hub.dispatchJobs()
+	}
 }
 
 func (hub *hubCenter) handleOnline(req online) {
-	for i := range req.online.Items {
-		data := req.online.Items[i]
+	for i := range req.onlineReq.Items {
+		data := req.onlineReq.Items[i]
 		if data.IsGroup {
-
+			group, isok := hub.groupMap[data.Id]
+			if isok {
+				conns, isok := group[req.wsConn.Id]
+				if data.IsOnline {
+					conns = req.wsConn
+					group[req.wsConn.Id] = conns
+				} else if isok {
+					delete(group, req.wsConn.Id)
+					if len(group) == 0 {
+						delete(hub.groupMap, data.Id)
+						if hasParentServer {
+							if req.wsConn.Id == hub.parentJob.wsConn.Id {
+								panic(fmt.Sprintf("onlineReq can't come from parent server"))
+							}
+							hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, data)
+							hub.messageCount++
+						}
+					}
+				}
+			} else if data.IsOnline {
+				group = make(map[uint32]*conn, 10)
+				group[req.wsConn.Id] = req.wsConn
+				if hasParentServer {
+					if req.wsConn.Id == hub.parentJob.wsConn.Id {
+						panic(fmt.Sprintf("onlineReq can't come from parent server"))
+					}
+					hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, data)
+					hub.messageCount++
+				}
+			}
+			if len(group) > 0 {
+				hub.groupMap[data.Id] = group
+			}
 		} else {
 			user, isok := hub.userMap[data.Id]
 			if data.IsOnline {
@@ -72,67 +157,98 @@ func (hub *hubCenter) handleOnline(req online) {
 			} else if isok {
 				delete(hub.userMap, data.Id)
 			}
+			if hasParentServer {
+				if req.wsConn.Id == hub.parentJob.wsConn.Id {
+					panic(fmt.Sprintf("onlineReq can't come from parent server"))
+				}
+				hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, data)
+				hub.messageCount++
+			}
 		}
+	}
+	if hub.messageCount >= ForceFlushMessageCount {
+		hub.dispatchJobs()
 	}
 }
 
-func (hub *hubCenter) processMessage(msg *messagepb.MessageReq) {
-	var jobs map[uint32]job
-	jobs = make(map[uint32]job)
-	for i := range msg.Messages {
-		data := msg.Messages[i]
+func (hub *hubCenter) processMessage(msg message) {
+	for i := range msg.messageReq.Messages {
+		data := msg.messageReq.Messages[i]
 		if data.IsGroupMessage {
 			var exceptConnId uint32
-			if !IsLeafServer {
-				userFrom, isok := hub.userMap[data.From]
+			if !isLeafServer {
+				userFromConn, isok := hub.userMap[data.From]
 				if isok {
-					exceptConnId = userFrom.Id
+					exceptConnId = userFromConn.Id
 				}
 			}
-
 			group, isok := hub.groupMap[data.To]
 			if isok {
 				for k, v := range group {
-					if !IsLeafServer {
+					if !isLeafServer {
 						if v.Id == exceptConnId {
 							continue
 						}
 					}
-					ajob, isok := jobs[k]
+					ajob, isok := hub.jobs[k]
 					if isok {
 						ajob.message.Messages = append(ajob.message.Messages, data)
 					} else {
 						msgReq := messagepb.MessageReq{Messages: []*messagepb.MessageReq_Message{data}}
-						ajob = job{wsConn: v, message: &msgReq}
+						ajob = job{wsConn: v, message: msgReq}
 					}
-					jobs[k] = ajob
+					hub.jobs[k] = ajob
+					hub.messageCount++
 				}
+			}
+			if hasParentServer && msg.wsConn.Id != hub.parentJob.wsConn.Id {
+				hub.parentJob.message.Messages = append(hub.parentJob.message.Messages, data)
+				hub.messageCount++
 			}
 		} else {
 			userConn, isok := hub.userMap[data.To]
 			if isok {
-				ajob, isok := jobs[userConn.Id]
+				ajob, isok := hub.jobs[userConn.Id]
 				if isok {
 					ajob.message.Messages = append(ajob.message.Messages, data)
+
 				} else {
 					msgReq := messagepb.MessageReq{Messages: []*messagepb.MessageReq_Message{data}}
-					ajob = job{wsConn: userConn, message: &msgReq}
+					ajob = job{wsConn: userConn, message: msgReq}
 				}
-				jobs[userConn.Id] = ajob
+				hub.jobs[userConn.Id] = ajob
+				hub.messageCount++
+			} else if hasParentServer && msg.wsConn.Id != hub.parentJob.wsConn.Id {
+				hub.parentJob.message.Messages = append(hub.parentJob.message.Messages, data)
+				hub.messageCount++
 			}
 		}
 	}
-	for _, v := range jobs {
-		var aworker *worker
-		hub.wp.lock.Lock()
-		if len(hub.wp.idle) > 0 {
-			aworker = hub.wp.idle[len(hub.wp.idle)-1]
-			hub.wp.idle = hub.wp.idle[:len(hub.wp.idle)-1]
-			hub.wp.lock.Unlock()
-		} else {
-			hub.wp.lock.Unlock()
-			aworker = hub.wp.pool.Get().(*worker)
-		}
-		aworker.ch <- v
+	if hub.messageCount >= ForceFlushMessageCount {
+		hub.dispatchJobs()
 	}
+}
+
+func (hub *hubCenter) dispatchJobs() {
+	needJobCount := len(hub.jobs)
+	parentJobCount := 0
+	if hasParentServer && (len(hub.parentJob.message.Messages) > 0 || len(hub.parentJob.onlineReq.Items) > 0) {
+		parentJobCount++
+	}
+	var workers []*worker
+	hub.wp.getWorkers(&workers, needJobCount+parentJobCount)
+	if len(workers) != needJobCount {
+		panic(fmt.Sprintf("the number of workers(%d) doesn't equal the nubmer of jobs(%d)", len(workers), needJobCount))
+	}
+	var i int
+	for _, v := range hub.jobs {
+		workers[i].ch <- v
+		i++
+	}
+	workers[i].ch <- hub.parentJob
+	if parentJobCount > 0 {
+		hub.parentJob.message.Messages = make([]*messagepb.MessageReq_Message, 0, 50)
+		hub.parentJob.onlineReq.Items = make([]*messagepb.OnlineReq_Item, 0, 10)
+	}
+	hub.jobs = make(map[uint32]job, 128)
 }
