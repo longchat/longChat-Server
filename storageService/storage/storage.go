@@ -89,12 +89,17 @@ func (s *Storage) initMongo() error {
 	return nil
 }
 
-func (s *Storage) Init() error {
+func NewStorage() (*Storage, error) {
+	s := new(Storage)
 	err := s.initMongo()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.initRedis()
+	err = s.initRedis()
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *Storage) Close() {

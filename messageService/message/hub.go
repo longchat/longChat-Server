@@ -54,6 +54,7 @@ func startHub(parentConn *conn) {
 		jobs:     make(map[uint32]job, 128),
 	}
 	go hub.hub()
+	go hub.wp.idleCleaner()
 }
 
 func (hub *hubCenter) hub() {

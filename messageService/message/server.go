@@ -30,7 +30,10 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func StartServer() {
+func StartServer(store *storage.Storage, addr string, parentAddr string) {
+	if parentAddr != "" {
+		hasParentServer = true
+	}
 	msgCh = make(chan message, 256)
 	if isLeafServer {
 		onlineCh = make(chan online, 128)
@@ -44,13 +47,15 @@ func StartServer() {
 				return &conn{}
 			},
 		},
+		store: store,
 	}
 	if hasParentServer {
-		s.connectParentAndStartHub("127.0.0.1")
+		s.connectParentAndStartHub(parentAddr)
 	} else {
 		go startHub(nil)
 	}
-	http.HandleFunc("/websocket", s.ServeWebSocket)
+	http.HandleFunc("/websocket", s.serveWebSocket)
+	http.ListenAndServe(addr, nil)
 }
 
 func (s *Server) connectParentAndStartHub(addr string) {
@@ -74,7 +79,7 @@ func (s *Server) connectParentAndStartHub(addr string) {
 	wsConn.readPump()
 }
 
-func (s *Server) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request) {
 	if isLeafServer {
 		s.serveLeaf(w, r)
 	} else {
