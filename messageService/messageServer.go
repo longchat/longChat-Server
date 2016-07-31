@@ -19,6 +19,10 @@ func main() {
 	if err != nil {
 		slog.Fatalln(consts.ErrGetConfigFailed(consts.ParentServiceAddress, err))
 	}
+	isLeaf, err := config.GetConfigBool(consts.IsLeafServer)
+	if err != nil {
+		slog.Fatalln(consts.ErrGetConfigFailed(consts.IsLeafServer, err))
+	}
 	store, err := storage.NewStorage()
 	if err != nil {
 		slog.Fatalln("init store failed!", err)
@@ -27,5 +31,5 @@ func main() {
 	if err != nil {
 		slog.Fatalf("init DB failed!err:=%v\n", err)
 	}
-	message.StartServer(store, addr, parentAddr)
+	message.StartServer(store, addr, parentAddr, isLeaf)
 }

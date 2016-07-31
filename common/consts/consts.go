@@ -22,9 +22,9 @@ const (
 
 	MsgServiceAddress    = "service.message.address"
 	ParentServiceAddress = "service.parent.address"
-
-	ErrorLogPath  = "log.error.path"
-	AccessLogPath = "log.access.path"
+	IsLeafServer         = "service.message.isleaf"
+	ErrorLogPath         = "log.error.path"
+	AccessLogPath        = "log.access.path"
 
 	TlsEnable = "security.tls.enable"
 

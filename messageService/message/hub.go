@@ -236,9 +236,12 @@ func (hub *hubCenter) dispatchJobs() {
 	if hasParentServer && (len(hub.parentJob.message.Messages) > 0 || len(hub.parentJob.onlineReq.Items) > 0) {
 		parentJobCount++
 	}
+	if needJobCount+parentJobCount == 0 {
+		return
+	}
 	var workers []*worker
 	hub.wp.getWorkers(&workers, needJobCount+parentJobCount)
-	if len(workers) != needJobCount {
+	if len(workers) != (needJobCount + parentJobCount) {
 		panic(fmt.Sprintf("the number of workers(%d) doesn't equal the nubmer of jobs(%d)", len(workers), needJobCount))
 	}
 	var i int
@@ -246,8 +249,8 @@ func (hub *hubCenter) dispatchJobs() {
 		workers[i].ch <- v
 		i++
 	}
-	workers[i].ch <- hub.parentJob
 	if parentJobCount > 0 {
+		workers[i].ch <- hub.parentJob
 		hub.parentJob.message.Messages = make([]*messagepb.MessageReq_Message, 0, 50)
 		hub.parentJob.onlineReq.Items = make([]*messagepb.OnlineReq_Item, 0, 10)
 	}

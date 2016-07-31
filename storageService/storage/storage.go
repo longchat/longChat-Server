@@ -134,6 +134,6 @@ func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
 	return getGroupById(s.db, id)
 }
 
-func (s *Storage) GetSessionValue(key string) (map[interface{}]interface{}, error) {
+func (s *Storage) GetSessionValue(key string) (map[string]interface{}, error) {
 	return getSessionValue(s.redis, s.sessionPrefix+key)
 }

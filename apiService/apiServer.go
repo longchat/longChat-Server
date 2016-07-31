@@ -38,15 +38,15 @@ func main() {
 	if err != nil {
 		slog.Fatalf("init IdGenerator failed!err:=%v\n", err)
 	}
-	store := storage.Storage{}
-	err = store.Init()
-	defer store.Close()
+	store, err := storage.NewStorage()
 	if err != nil {
 		slog.Fatalf("init DB failed!err:=%v\n", err)
 	}
 
+	defer store.Close()
+
 	framework := iris.New()
-	api.Iint(framework, &idGen, &store)
+	api.Iint(framework, &idGen, store)
 	framework.Listen(addr)
 
 }

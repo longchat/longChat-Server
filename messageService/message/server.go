@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	slog "log"
 	"net"
 	"net/http"
@@ -30,10 +31,11 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func StartServer(store *storage.Storage, addr string, parentAddr string) {
+func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf bool) {
 	if parentAddr != "" {
 		hasParentServer = true
 	}
+	isLeafServer = isLeaf
 	msgCh = make(chan message, 256)
 	if isLeafServer {
 		onlineCh = make(chan online, 128)
@@ -76,7 +78,7 @@ func (s *Server) connectParentAndStartHub(addr string) {
 	wsConn := s.getWsConn(ws)
 	defer s.releaseWsConn(wsConn)
 	go startHub(wsConn)
-	wsConn.readPump()
+	wsConn.readPump(0)
 }
 
 func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +98,7 @@ func (s *Server) serveNode(w http.ResponseWriter, r *http.Request) {
 	}
 	wsConn := s.getWsConn(ws)
 	defer s.releaseWsConn(wsConn)
-	wsConn.readPump()
+	wsConn.readPump(0)
 	rmConnCh <- removeConn{wsConn}
 }
 
@@ -138,7 +140,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("internal server error"))
 		return
 	}
-	olItems := make([]*messagepb.OnlineReq_Item, 0, 4)
+	olItems := make([]*messagepb.OnlineReq_Item, 1, 4)
 	olItems[0] = &messagepb.OnlineReq_Item{
 		Id:       user.Id,
 		IsOnline: true,
@@ -154,6 +156,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 	req := messagepb.OnlineReq{olItems}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		fmt.Println("upgrader  failed!", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return
@@ -161,7 +164,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 	wsConn := s.getWsConn(ws)
 	defer s.releaseWsConn(wsConn)
 	onlineCh <- online{wsConn, req}
-	wsConn.readPump()
+	wsConn.readPump(userId)
 	for i := range req.Items {
 		req.Items[i].IsOnline = false
 	}
