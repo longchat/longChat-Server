@@ -1,17 +1,18 @@
 package message
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
 	messagepb "github.com/longchat/longChat-Server/common/protoc"
+	"github.com/longchat/longChat-Server/common/util"
 )
 
 const (
 	MessageTypeMessage int = 1
 	MessageTypeOnline  int = 2
+	MessageTypeGroup   int = 3
 )
 
 type connState uint8
@@ -30,11 +31,10 @@ type conn struct {
 
 func (wsConn *conn) readPump(userId int64) {
 	for {
-		msgType, msg, err := wsConn.ws.ReadMessage()
+		_, msg, err := wsConn.ws.ReadMessage()
 		if err != nil {
 			break
 		}
-		fmt.Println(msgType, "  ", msg)
 		if int(msg[0]) == MessageTypeMessage {
 			msg = msg[1:]
 			var messageReq messagepb.MessageReq
@@ -44,10 +44,9 @@ func (wsConn *conn) readPump(userId int64) {
 			}
 			if userId != 0 {
 				for i := range messageReq.Messages {
-					messageReq.Messages[i].From = userId
+					messageReq.Messages[i].From = util.Int2Bytes(userId)
 				}
 			}
-			fmt.Println(messageReq.Messages)
 			msgCh <- message{wsConn: wsConn, messageReq: messageReq}
 		} else if int(msg[0]) == MessageTypeOnline {
 			msg = msg[1:]
@@ -64,12 +63,10 @@ func (wsConn *conn) readPump(userId int64) {
 func (wsConn *conn) writeAndFlush(messageType int, pb proto.Message) error {
 	writer, err := wsConn.ws.NextWriter(websocket.BinaryMessage)
 	if err != nil {
-		fmt.Println("writer:", writer, err)
 		return err
 	}
 	bytes, err := proto.Marshal(pb)
 	if err != nil {
-		fmt.Println("bytes:", bytes, err)
 		return err
 	}
 	rb := make([]byte, len(bytes)+1)

@@ -6,6 +6,7 @@ messageService/messageService
 routerService/routerService
 storageService/storageService
 logs/
-config.cfg
-config2.cfg
+child.cfg
+child2.cfg
+parent.cfg
 longChat-Server

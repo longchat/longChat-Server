@@ -4,9 +4,9 @@ package protoc;
 
 message MessageReq {
     message  Message {
-   	int64 Id=1;
-   	int64 From=2;
-    	int64 To=3;
+   	bytes Id=1;
+   	bytes From=2;
+    	bytes To=3;
 	string Content=4;
 	enum ContentType {
 	   Text = 0;
@@ -22,9 +22,21 @@ message MessageReq {
 
 message OnlineReq{
     message  Item {
-   	int64  Id=1;
+   	bytes  Id=1;
 	bool   IsOnline=2;
 	bool   IsGroup=3;
     }
     repeated Item Items = 1;
+}
+
+
+message GroupReq{
+    message Group {
+        bytes  Id=1;
+	string Title=2;
+	string Logo=3;
+	repeated bytes Members=4;
+	string Introduce=5;
+    }
+    repeated Group Groups = 1;
 }

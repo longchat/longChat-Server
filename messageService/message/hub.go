@@ -5,6 +5,7 @@ import (
 	"time"
 
 	messagepb "github.com/longchat/longChat-Server/common/protoc"
+	"github.com/longchat/longChat-Server/common/util"
 )
 
 const (
@@ -79,7 +80,7 @@ func (hub *hubCenter) removeConn(rmConn removeConn) {
 			delete(hub.userMap, k)
 			if hasParentServer {
 				hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, &messagepb.OnlineReq_Item{
-					Id:       k,
+					Id:       util.Int2Bytes(k),
 					IsGroup:  false,
 					IsOnline: false,
 				})
@@ -95,7 +96,7 @@ func (hub *hubCenter) removeConn(rmConn removeConn) {
 					delete(hub.groupMap, k)
 					if hasParentServer {
 						hub.parentJob.onlineReq.Items = append(hub.parentJob.onlineReq.Items, &messagepb.OnlineReq_Item{
-							Id:       k,
+							Id:       util.Int2Bytes(k),
 							IsGroup:  true,
 							IsOnline: false,
 						})
@@ -117,7 +118,7 @@ func (hub *hubCenter) handleOnline(req online) {
 	for i := range req.onlineReq.Items {
 		data := req.onlineReq.Items[i]
 		if data.IsGroup {
-			group, isok := hub.groupMap[data.Id]
+			group, isok := hub.groupMap[util.Bytes2Int(data.Id)]
 			if isok {
 				conns, isok := group[req.wsConn.Id]
 				if data.IsOnline {
@@ -126,7 +127,7 @@ func (hub *hubCenter) handleOnline(req online) {
 				} else if isok {
 					delete(group, req.wsConn.Id)
 					if len(group) == 0 {
-						delete(hub.groupMap, data.Id)
+						delete(hub.groupMap, util.Bytes2Int(data.Id))
 						if hasParentServer {
 							if req.wsConn.Id == hub.parentJob.wsConn.Id {
 								panic(fmt.Sprintf("onlineReq can't come from parent server"))
@@ -148,15 +149,15 @@ func (hub *hubCenter) handleOnline(req online) {
 				}
 			}
 			if len(group) > 0 {
-				hub.groupMap[data.Id] = group
+				hub.groupMap[util.Bytes2Int(data.Id)] = group
 			}
 		} else {
-			user, isok := hub.userMap[data.Id]
+			user, isok := hub.userMap[util.Bytes2Int(data.Id)]
 			if data.IsOnline {
 				user = req.wsConn
-				hub.userMap[data.Id] = user
+				hub.userMap[util.Bytes2Int(data.Id)] = user
 			} else if isok {
-				delete(hub.userMap, data.Id)
+				delete(hub.userMap, util.Bytes2Int(data.Id))
 			}
 			if hasParentServer {
 				if req.wsConn.Id == hub.parentJob.wsConn.Id {
@@ -178,12 +179,12 @@ func (hub *hubCenter) processMessage(msg message) {
 		if data.IsGroupMessage {
 			var exceptConnId uint32
 			if !isLeafServer {
-				userFromConn, isok := hub.userMap[data.From]
+				userFromConn, isok := hub.userMap[util.Bytes2Int(data.From)]
 				if isok {
 					exceptConnId = userFromConn.Id
 				}
 			}
-			group, isok := hub.groupMap[data.To]
+			group, isok := hub.groupMap[util.Bytes2Int(data.To)]
 			if isok {
 				for k, v := range group {
 					if !isLeafServer {
@@ -207,7 +208,7 @@ func (hub *hubCenter) processMessage(msg message) {
 				hub.messageCount++
 			}
 		} else {
-			userConn, isok := hub.userMap[data.To]
+			userConn, isok := hub.userMap[util.Bytes2Int(data.To)]
 			if isok {
 				ajob, isok := hub.jobs[userConn.Id]
 				if isok {

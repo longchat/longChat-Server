@@ -1,7 +1,6 @@
 package message
 
 import (
-	"fmt"
 	slog "log"
 	"net"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	messagepb "github.com/longchat/longChat-Server/common/protoc"
+	"github.com/longchat/longChat-Server/common/util"
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
@@ -52,7 +52,7 @@ func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf 
 		store: store,
 	}
 	if hasParentServer {
-		s.connectParentAndStartHub(parentAddr)
+		go s.connectParentAndStartHub(parentAddr)
 	} else {
 		go startHub(nil)
 	}
@@ -142,27 +142,40 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 	}
 	olItems := make([]*messagepb.OnlineReq_Item, 1, 4)
 	olItems[0] = &messagepb.OnlineReq_Item{
-		Id:       user.Id,
+		Id:       util.Int2Bytes(user.Id),
 		IsOnline: true,
 		IsGroup:  false,
 	}
+	var groups messagepb.GroupReq
 	for i := range user.JoinedGroups {
 		olItems = append(olItems, &messagepb.OnlineReq_Item{
-			Id:       user.JoinedGroups[i].Id,
+			Id:       util.Int2Bytes(user.JoinedGroups[i].Id),
 			IsOnline: true,
 			IsGroup:  true,
 		})
+		group, err := s.store.GetGroupById(user.JoinedGroups[i].Id)
+		if err != nil {
+			return
+		}
+		members := make([][]byte, 0, 10)
+		for _, data := range group.Members {
+			members = append(members, util.Int2Bytes(data))
+		}
+		groups.Groups = append(groups.Groups, &messagepb.GroupReq_Group{Id: util.Int2Bytes(group.Id), Title: group.Title, Logo: group.Logo, Introduce: group.Introduce, Members: members})
 	}
 	req := messagepb.OnlineReq{olItems}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println("upgrader  failed!", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return
 	}
 	wsConn := s.getWsConn(ws)
 	defer s.releaseWsConn(wsConn)
+	err = wsConn.writeAndFlush(MessageTypeGroup, &groups)
+	if err != nil {
+		return
+	}
 	onlineCh <- online{wsConn, req}
 	wsConn.readPump(userId)
 	for i := range req.Items {
