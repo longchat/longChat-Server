@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -58,11 +59,12 @@ func (wp *workerPool) idleCleaner() {
 		}
 		releases = wp.idle[:i]
 		wp.idle = wp.idle[i:]
+		fmt.Println("release:", len(releases), "remain:", len(wp.idle))
 		wp.idleLock.Unlock()
 		for j := range releases {
 			//pass an empty job{} to stop the goroutine
 			releases[j].ch <- job{}
-			wp.pool.Put(releases[i])
+			wp.pool.Put(releases[j])
 		}
 	}
 }
@@ -77,6 +79,7 @@ func (wp *workerPool) getWorkers(workers *[]*worker, jobLen int) {
 		*workers = wp.idle[:]
 		wp.idle = wp.idle[:0]
 	}
+	fmt.Println("get workers from pool:", len(*workers))
 	wp.idleLock.Unlock()
 	if fetchLen < 0 {
 		for i := 0; i < (-fetchLen); i++ {
@@ -88,8 +91,8 @@ func (wp *workerPool) getWorkers(workers *[]*worker, jobLen int) {
 }
 
 func (wp *workerPool) releaseWorker(worker *worker) {
-	worker.lastUseTs = time.Now().UnixNano()
 	wp.idleLock.Lock()
+	worker.lastUseTs = time.Now().UnixNano()
 	wp.idle = append(wp.idle, worker)
 	wp.idleLock.Unlock()
 }
@@ -99,15 +102,11 @@ func (wp *workerPool) worker(worker *worker) {
 		if info.wsConn == nil {
 			break
 		}
-		var err error
 		if len(info.message.Messages) > 0 {
-			err = info.wsConn.writeAndFlush(MessageTypeMessage, &info.message)
+			info.wsConn.writeAndFlush(MessageTypeMessage, &info.message)
 		} else if len(info.onlineReq.Items) > 0 {
-			err = info.wsConn.writeAndFlush(MessageTypeOnline, &info.onlineReq)
+			info.wsConn.writeAndFlush(MessageTypeOnline, &info.onlineReq)
 		}
-		if err != nil {
-			wp.releaseWorker(worker)
-			continue
-		}
+		wp.releaseWorker(worker)
 	}
 }

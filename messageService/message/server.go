@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	slog "log"
 	"net"
 	"net/http"
@@ -57,6 +58,7 @@ func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf 
 		go startHub(nil)
 	}
 	http.HandleFunc("/websocket", s.serveWebSocket)
+	fmt.Println("message server running on:", addr)
 	http.ListenAndServe(addr, nil)
 }
 
@@ -166,6 +168,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 	req := messagepb.OnlineReq{olItems}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		fmt.Println("upgrade websocket failed!", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return

@@ -2,6 +2,7 @@ package message
 
 import (
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
@@ -61,10 +62,6 @@ func (wsConn *conn) readPump(userId int64) {
 }
 
 func (wsConn *conn) writeAndFlush(messageType int, pb proto.Message) error {
-	writer, err := wsConn.ws.NextWriter(websocket.BinaryMessage)
-	if err != nil {
-		return err
-	}
 	bytes, err := proto.Marshal(pb)
 	if err != nil {
 		return err
@@ -76,6 +73,12 @@ func (wsConn *conn) writeAndFlush(messageType int, pb proto.Message) error {
 	wsConn.wLock.Lock()
 	defer wsConn.wLock.Unlock()
 	if wsConn.state == ConnStateIdle || wsConn.Id != id {
+		return err
+	}
+	wsConn.ws.SetWriteDeadline(time.Now().Add(time.Second * 2))
+	writer, err := wsConn.ws.NextWriter(websocket.BinaryMessage)
+	if err != nil {
+		wsConn.state = ConnStateIdle
 		return err
 	}
 	_, err = writer.Write(rb)
