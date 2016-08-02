@@ -3,6 +3,7 @@ ssl/
 apiService/apiService
 idService/idService
 messageService/messageService
+messageService/messageServer
 routerService/routerService
 storageService/storageService
 logs/

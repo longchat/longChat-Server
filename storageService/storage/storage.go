@@ -107,9 +107,15 @@ func (s *Storage) Close() {
 		s.db.Session.Close()
 	}
 }
+
+func (s *Storage) AddUserGroup(userId int64, groupId int64) error {
+	return addUserGroup(s.db, groupId, userId)
+}
+
 func (s *Storage) UpdateUserInfo(id int64, nickName string, avatar string, intro string) error {
 	return updateUserInfo(s.db, id, nickName, avatar, intro)
 }
+
 func (s *Storage) CreateUser(id int64, userName string, password string, salt string, lastLoginIp string) error {
 	return createUser(s.db, id, userName, password, salt, lastLoginIp)
 }
@@ -124,6 +130,10 @@ func (s *Storage) GetUserById(id int64) (*schema.User, error) {
 
 func (s *Storage) GetUsersById(ids []int64) ([]schema.User, error) {
 	return getUsersById(s.db, ids)
+}
+
+func (s *Storage) AddGroupMember(groupId int64, userId int64) error {
+	return addGroupMember(s.db, groupId, userId)
 }
 
 func (s *Storage) GetGroupsByOrderIdx(orderIdx int64, limit int) ([]schema.Group, error) {

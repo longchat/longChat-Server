@@ -55,3 +55,12 @@ func getUsersById(db *mgo.Database, ids []int64) ([]schema.User, error) {
 	}
 	return users, nil
 }
+
+func addUserGroup(db *mgo.Database, groupId int64, userId int64) error {
+	err := db.C("User").Update(bson.M{"_id": userId}, bson.M{"$push": bson.M{"joinedgroups": groupId}})
+	if err != nil && err != mgo.ErrNotFound {
+		log.ERROR.Printf("add a member to a group failed!err:=%v\n", err)
+		return err
+	}
+	return nil
+}

@@ -20,7 +20,33 @@ func (ga *GroupApi) RegisterRoute(framework *iris.Framework) {
 	users := framework.Party("/groups")
 	users.Get("", ga.getGroupList)
 	users.Get("/:id", ga.getGroupDetail)
+	users.Post("/:id/members/:uid", ga.joinGroup)
 
+}
+
+func (ga *GroupApi) joinGroup(c *iris.Context) {
+	gId, err := c.ParamInt64("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		return
+	}
+	uId, err := c.ParamInt64("uid")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("uid"))
+		return
+	}
+	err = ga.store.AddGroupMember(gId, uId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		return
+	}
+	err = ga.store.AddUserGroup(uId, gId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		return
+	}
+	rsp := dto.SuccessRsp()
+	c.JSON(200, &rsp)
 }
 
 func (ga *GroupApi) getGroupDetail(c *iris.Context) {

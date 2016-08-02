@@ -25,3 +25,12 @@ func getGroupById(db *mgo.Database, id int64) (*schema.Group, error) {
 	}
 	return &group, nil
 }
+
+func addGroupMember(db *mgo.Database, groupId int64, userId int64) error {
+	err := db.C("Group").Update(bson.M{"_id": groupId}, bson.M{"$push": bson.M{"members": userId}})
+	if err != nil && err != mgo.ErrNotFound {
+		log.ERROR.Printf("add a member to a group failed!err:=%v\n", err)
+		return err
+	}
+	return nil
+}
