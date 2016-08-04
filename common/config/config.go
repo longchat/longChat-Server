@@ -1,7 +1,6 @@
 package config
 
 import (
-	"flag"
 	slog "log"
 	"strconv"
 	"strings"
@@ -67,20 +66,14 @@ func loadConfigFile() error {
 	return nil
 }
 
-func InitConfig() {
+func InitConfig(pconfig *string, psection *string) {
 	var err error
-
-	pconfig := flag.String("config", "../config.cfg", "config file")
-	psection := flag.String("section", "dev", "section of config file to apply")
-	flag.Parse()
+	if *pconfig == "" || *psection == "" {
+		slog.Fatalf("config and section not found in Env\n")
+	}
 	env = map[string]string{
 		"config":  *pconfig,
 		"section": *psection,
-	}
-	_, ok := env["config"]
-	_, ok1 := env["section"]
-	if !ok || !ok1 {
-		slog.Fatalf("config and section not found in Env\n")
 	}
 	configpath, _ := env["config"]
 	defaultConfig, err = conf.ReadDefault(configpath)

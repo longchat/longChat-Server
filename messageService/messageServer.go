@@ -1,7 +1,12 @@
 package main
 
 import (
+	"flag"
 	slog "log"
+	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
 
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
@@ -10,8 +15,52 @@ import (
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
+var cpuf *os.File
+
 func main() {
-	config.InitConfig()
+	pconfig := flag.String("config", "../config.cfg", "config file")
+	psection := flag.String("section", "dev", "section of config file to apply")
+	cpuProfile := flag.String("cpuprofile", "", "write cpu profile to file")
+	memProfile := flag.String("memprofile", "", "write mem profile to file")
+
+	flag.Parse()
+	if *cpuProfile != "" {
+		var err error
+		cpuf, err = os.Create(*cpuProfile)
+		if err != nil {
+			slog.Fatal(err)
+		}
+		pprof.StartCPUProfile(cpuf)
+	}
+	go func() {
+		if *memProfile != "" || *cpuProfile != "" {
+			c := make(chan os.Signal)
+			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+			for {
+				s := <-c
+				if s.(syscall.Signal) == syscall.SIGINT || s.(syscall.Signal) == syscall.SIGTERM {
+					break
+				}
+			}
+
+			if *memProfile != "" {
+				memf, err := os.Create(*memProfile)
+				if err != nil {
+					slog.Fatal(err)
+				}
+				pprof.WriteHeapProfile(memf)
+				memf.Close()
+			}
+			if *cpuProfile != "" {
+				pprof.StopCPUProfile()
+				cpuf.Close()
+			}
+		}
+		os.Exit(0)
+	}()
+
+	config.InitConfig(pconfig, psection)
+
 	accPath, err := config.GetConfigString(consts.AccessLogPath)
 	if err != nil {
 		slog.Fatalf(consts.ErrGetConfigFailed(consts.AccessLogPath, err))

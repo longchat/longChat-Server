@@ -16,6 +16,7 @@ const (
 type hubCenter struct {
 	parentJob job
 	wp        *workerPool
+	workers   []*worker
 	//优先user上线，再group上线
 	userMap  map[int64]*conn
 	groupMap map[int64]map[uint32]*conn
@@ -53,6 +54,7 @@ func startHub(parentConn *conn) {
 		groupMap: make(map[int64]map[uint32]*conn, 128),
 		wp:       newWorkerPool(),
 		jobs:     make(map[uint32]job, 128),
+		workers:  make([]*worker, 8),
 	}
 	go hub.hub()
 	go hub.wp.idleCleaner()
@@ -240,20 +242,22 @@ func (hub *hubCenter) dispatchJobs() {
 	if needJobCount+parentJobCount == 0 {
 		return
 	}
-	var workers []*worker
-	hub.wp.getWorkers(&workers, needJobCount+parentJobCount)
-	if len(workers) != (needJobCount + parentJobCount) {
-		panic(fmt.Sprintf("the number of workers(%d) doesn't equal the nubmer of jobs(%d)", len(workers), needJobCount))
+	if cap(hub.workers) < (needJobCount + parentJobCount) {
+		hub.workers = make([]*worker, needJobCount+parentJobCount)
+	} else {
+		hub.workers = hub.workers[:needJobCount+parentJobCount]
 	}
+	hub.wp.getWorkers(&hub.workers, needJobCount+parentJobCount)
 	var i int
 	for _, v := range hub.jobs {
-		workers[i].ch <- v
+		hub.workers[i].ch <- v
 		i++
 	}
 	if parentJobCount > 0 {
-		workers[i].ch <- hub.parentJob
+		hub.workers[i].ch <- hub.parentJob
 		hub.parentJob.message.Messages = make([]*messagepb.MessageReq_Message, 0, 50)
 		hub.parentJob.onlineReq.Items = make([]*messagepb.OnlineReq_Item, 0, 10)
 	}
-	hub.jobs = make(map[uint32]job, 128)
+
+	hub.jobs = make(map[uint32]job, 16)
 }

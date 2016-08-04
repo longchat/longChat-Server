@@ -37,9 +37,7 @@ func newWorkerPool() *workerPool {
 	}
 	wp.pool = sync.Pool{
 		New: func() interface{} {
-			w := new(worker)
-			w.ch = make(chan job)
-			return w
+			return nil
 		},
 	}
 	return wp
@@ -59,7 +57,6 @@ func (wp *workerPool) idleCleaner() {
 		}
 		releases = wp.idle[:i]
 		wp.idle = wp.idle[i:]
-		fmt.Println("release:", len(releases), "remain:", len(wp.idle))
 		wp.idleLock.Unlock()
 		for j := range releases {
 			//pass an empty job{} to stop the goroutine
@@ -70,22 +67,28 @@ func (wp *workerPool) idleCleaner() {
 }
 
 func (wp *workerPool) getWorkers(workers *[]*worker, jobLen int) {
+	var workerSelf []*worker
 	wp.idleLock.Lock()
-	fetchLen := len(wp.idle) - jobLen
-	if fetchLen >= 0 {
-		*workers = wp.idle[fetchLen:]
-		wp.idle = wp.idle[:fetchLen]
+	remain := len(wp.idle) - jobLen
+	if remain >= 0 {
+		workerSelf = wp.idle[remain:]
+		wp.idle = wp.idle[:remain]
 	} else {
-		*workers = wp.idle[:]
+		workerSelf = wp.idle[:]
 		wp.idle = wp.idle[:0]
 	}
-	fmt.Println("get workers from pool:", len(*workers))
+	copy(*workers, workerSelf)
 	wp.idleLock.Unlock()
-	if fetchLen < 0 {
-		for i := 0; i < (-fetchLen); i++ {
-			aworker := wp.pool.Get().(*worker)
-			go wp.worker(aworker)
-			*workers = append(*workers, aworker)
+	if remain < 0 {
+		for i := 0; i < (-remain); i++ {
+			aworker := wp.pool.Get()
+			if aworker == nil {
+				w := new(worker)
+				w.ch = make(chan job)
+				aworker = w
+			}
+			go wp.worker(aworker.(*worker))
+			(*workers)[jobLen+remain+i] = aworker.(*worker)
 		}
 	}
 }
@@ -106,6 +109,9 @@ func (wp *workerPool) worker(worker *worker) {
 			info.wsConn.writeAndFlush(MessageTypeMessage, &info.message)
 		} else if len(info.onlineReq.Items) > 0 {
 			info.wsConn.writeAndFlush(MessageTypeOnline, &info.onlineReq)
+		}
+		if len(worker.ch) != 0 {
+			panic("worker.ch's length must be zero")
 		}
 		wp.releaseWorker(worker)
 	}

@@ -11,3 +11,6 @@ child.cfg
 child2.cfg
 parent.cfg
 longChat-Server
+pprofile
+apiService/nohup.out
+idService/nohup.out

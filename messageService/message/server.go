@@ -39,10 +39,10 @@ func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf 
 	isLeafServer = isLeaf
 	msgCh = make(chan message, 256)
 	if isLeafServer {
-		onlineCh = make(chan online, 128)
+		onlineCh = make(chan online, 32)
 	} else {
 		rmConnCh = make(chan removeConn)
-		onlineCh = make(chan online, 32)
+		onlineCh = make(chan online, 8)
 	}
 	s := Server{
 		connPool: sync.Pool{

@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -83,10 +84,12 @@ func (wsConn *conn) writeAndFlush(messageType int, pb proto.Message) error {
 	}
 	_, err = writer.Write(rb)
 	if err != nil {
+		wsConn.state = ConnStateIdle
 		return err
 	}
 	err = writer.Close()
 	if err != nil {
+		wsConn.state = ConnStateIdle
 		return err
 	}
 	return nil
