@@ -6,6 +6,7 @@ messageService/messageService
 messageService/messageServer
 routerService/routerService
 storageService/storageService
+graphService/graphService
 logs/
 child.cfg
 child2.cfg
