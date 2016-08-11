@@ -8,13 +8,15 @@ import (
 	"github.com/longchat/longChat-Server/apiService/api/dto"
 	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/common/util"
+	"github.com/longchat/longChat-Server/graphService/graph"
 	"github.com/longchat/longChat-Server/idService/generator"
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
 type UserApi struct {
-	idGen *generator.IdGenerator
-	store *storage.Storage
+	idGen       *generator.IdGenerator
+	store       *storage.Storage
+	serverAddrs []string
 }
 
 func (ua *UserApi) RegisterRoute(framework *iris.Framework) {
@@ -22,6 +24,26 @@ func (ua *UserApi) RegisterRoute(framework *iris.Framework) {
 	users.Post("", ua.createUser)
 	users.Put("/:id", ua.updateInfo)
 	users.Get("/:id", ua.getInfo)
+	users.Get("/:id/serveraddr", ua.getserverAddr)
+}
+
+func (ua *UserApi) getserverAddr(c *iris.Context) {
+	uid, err := c.ParamInt64("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		return
+	}
+	clusterId, err := graph.GetClusterByUserId(uid)
+	if err != nil {
+		log.ERROR.Printf("get user  cluster id from graph failed!err:=%v\n", uid, err)
+		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		return
+	}
+
+	id := clusterId % len(ua.serverAddrs)
+	userRsp := dto.GetUserServerAddrRsp{BaseRsp: *dto.SuccessRsp()}
+	userRsp.Data.Addr = ua.serverAddrs[id]
+	c.JSON(http.StatusOK, &userRsp)
 }
 
 func (ua *UserApi) getInfo(c *iris.Context) {
@@ -44,7 +66,6 @@ func (ua *UserApi) getInfo(c *iris.Context) {
 		Introduce: user.Introduce,
 	}
 	c.JSON(http.StatusOK, &userRsp)
-
 }
 
 func (ua *UserApi) updateInfo(c *iris.Context) {

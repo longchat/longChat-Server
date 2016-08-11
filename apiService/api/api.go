@@ -2,6 +2,7 @@ package api
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"github.com/iris-contrib/sessiondb/redis"
@@ -50,7 +51,12 @@ func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storag
 
 	framework.UseSessionDB(db)
 
-	ua := UserApi{idGen: idGen, store: store}
+	addrStr, err := config.GetConfigString(consts.LeafMsgServiceAddress)
+	if err != nil {
+		log.Fatalf(consts.ErrGetConfigFailed(consts.SessionCookieName, err))
+	}
+	addrs := strings.Split(addrStr, ",")
+	ua := UserApi{idGen: idGen, store: store, serverAddrs: addrs}
 	ua.RegisterRoute(framework)
 	au := AuthApi{store: store}
 	au.RegisterRoute(framework)

@@ -17,7 +17,7 @@ type hubCenter struct {
 	parentJob job
 	wp        *workerPool
 	workers   []*worker
-	//优先user上线，再group上线
+
 	userMap  map[int64]*conn
 	groupMap map[int64]map[uint32]*conn
 

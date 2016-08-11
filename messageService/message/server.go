@@ -15,8 +15,9 @@ import (
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
+var store *storage.Storage
+
 type Server struct {
-	store     *storage.Storage
 	connPool  sync.Pool
 	maxConnId uint32
 }
@@ -32,7 +33,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf bool) {
+func StartServer(storage *storage.Storage, addr string, parentAddr string, isLeaf bool) {
 	if parentAddr != "" {
 		hasParentServer = true
 	}
@@ -50,8 +51,8 @@ func StartServer(store *storage.Storage, addr string, parentAddr string, isLeaf 
 				return &conn{}
 			},
 		},
-		store: store,
 	}
+	store = storage
 	if hasParentServer {
 		go s.connectParentAndStartHub(parentAddr)
 	} else {
@@ -123,7 +124,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("invalid session cookie"))
 		return
 	}
-	rmap, err := s.store.GetSessionValue(sId)
+	rmap, err := store.GetSessionValue(sId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
@@ -136,7 +137,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userId := uid.(int64)
-	user, err := s.store.GetUserById(userId)
+	user, err := store.GetUserById(userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
@@ -155,7 +156,7 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 			IsOnline: true,
 			IsGroup:  true,
 		})
-		group, err := s.store.GetGroupById(user.JoinedGroups[i].Id)
+		group, err := store.GetGroupById(user.JoinedGroups[i].Id)
 		if err != nil {
 			return
 		}

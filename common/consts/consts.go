@@ -16,15 +16,17 @@ const (
 	RedisAddress  = "redis.address"
 	RedisPassword = "redis.password"
 	RedisDb       = "redis.db"
+	Neo4JDbUrl    = "neo4j.url"
 
 	ApiServiceAddress    = "service.api.address"
 	ApiServiceStaticPath = "service.api.staticpath"
 
-	MsgServiceAddress    = "service.message.address"
-	ParentServiceAddress = "service.parent.address"
-	IsLeafServer         = "service.message.isleaf"
-	ErrorLogPath         = "log.error.path"
-	AccessLogPath        = "log.access.path"
+	LeafMsgServiceAddress = "service.message.leaf.addrs"
+	MsgServiceAddress     = "service.message.address"
+	ParentServiceAddress  = "service.parent.address"
+	IsLeafServer          = "service.message.isleaf"
+	ErrorLogPath          = "log.error.path"
+	AccessLogPath         = "log.access.path"
 
 	TlsEnable = "security.tls.enable"
 

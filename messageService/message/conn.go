@@ -46,7 +46,24 @@ func (wsConn *conn) readPump(userId int64) {
 			}
 			if userId != 0 {
 				for i := range messageReq.Messages {
+					ts := time.Now().UnixNano()
+					messageReq.Messages[i].Id = util.Int2Bytes(ts)
 					messageReq.Messages[i].From = util.Int2Bytes(userId)
+					var err error
+					if messageReq.Messages[i].IsGroupMessage {
+						err = store.CreateGroupMessage(ts, userId,
+							util.Bytes2Int(messageReq.Messages[i].To),
+							messageReq.Messages[i].Content,
+							int(messageReq.Messages[i].Type))
+					} else {
+						err = store.CreateUserMessage(ts, userId,
+							util.Bytes2Int(messageReq.Messages[i].To),
+							messageReq.Messages[i].Content,
+							int(messageReq.Messages[i].Type))
+					}
+					if err != nil {
+						fmt.Println("sotre message failed!", err)
+					}
 				}
 			}
 			msgCh <- message{wsConn: wsConn, messageReq: messageReq}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	slog "log"
 
 	"github.com/kataras/iris"
@@ -8,12 +9,16 @@ import (
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/common/log"
+	"github.com/longchat/longChat-Server/graphService/graph"
 	"github.com/longchat/longChat-Server/idService/generator"
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
 func main() {
-	config.InitConfig()
+	pconfig := flag.String("config", "../config.cfg", "config file")
+	psection := flag.String("section", "dev", "section of config file to apply")
+	flag.Parse()
+	config.InitConfig(pconfig, psection)
 	accPath, err := config.GetConfigString(consts.AccessLogPath)
 	if err != nil {
 		slog.Fatalf(consts.ErrGetConfigFailed(consts.AccessLogPath, err))
@@ -42,9 +47,17 @@ func main() {
 	if err != nil {
 		slog.Fatalf("init DB failed!err:=%v\n", err)
 	}
-
 	defer store.Close()
 
+	neoUrl, err := config.GetConfigString(consts.Neo4JDbUrl)
+	if err != nil {
+		slog.Fatalln(consts.ErrGetConfigFailed(consts.Neo4JDbUrl, err))
+	}
+	err = graph.NewDb(neoUrl)
+	if err != nil {
+		slog.Fatalf("init graph service failed!", err)
+	}
+	defer graph.FinDb()
 	framework := iris.New()
 	api.Iint(framework, &idGen, store)
 	framework.Listen(addr)

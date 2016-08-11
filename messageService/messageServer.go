@@ -32,8 +32,8 @@ func main() {
 		}
 		pprof.StartCPUProfile(cpuf)
 	}
-	go func() {
-		if *memProfile != "" || *cpuProfile != "" {
+	if *memProfile != "" || *cpuProfile != "" {
+		go func() {
 			c := make(chan os.Signal)
 			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 			for {
@@ -55,10 +55,9 @@ func main() {
 				pprof.StopCPUProfile()
 				cpuf.Close()
 			}
-		}
-		os.Exit(0)
-	}()
-
+			os.Exit(0)
+		}()
+	}
 	config.InitConfig(pconfig, psection)
 
 	accPath, err := config.GetConfigString(consts.AccessLogPath)

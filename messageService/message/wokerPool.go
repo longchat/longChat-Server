@@ -1,11 +1,11 @@
 package message
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	messagepb "github.com/longchat/longChat-Server/common/protoc"
+	"github.com/longchat/longChat-Server/common/util"
 )
 
 const (
@@ -105,11 +105,24 @@ func (wp *workerPool) worker(worker *worker) {
 		if info.wsConn == nil {
 			break
 		}
+		var err error
 		if len(info.message.Messages) > 0 {
-			info.wsConn.writeAndFlush(MessageTypeMessage, &info.message)
+			err = info.wsConn.writeAndFlush(MessageTypeMessage, &info.message)
 		} else if len(info.onlineReq.Items) > 0 {
-			info.wsConn.writeAndFlush(MessageTypeOnline, &info.onlineReq)
+			err = info.wsConn.writeAndFlush(MessageTypeOnline, &info.onlineReq)
 		}
+		if isLeafServer {
+			if !hasParentServer || info.wsConn.Id > 1 {
+				if err == nil {
+					for _, data := range info.message.Messages {
+						if !data.IsGroupMessage {
+							store.MarkUserMessageRead(util.Bytes2Int(data.Id))
+						}
+					}
+				}
+			}
+		}
+
 		if len(worker.ch) != 0 {
 			panic("worker.ch's length must be zero")
 		}

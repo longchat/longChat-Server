@@ -1,19 +1,22 @@
 package schema
 
 
-//为每一个group创建一个collection存放message，所以不需要groupId
+
 type GroupMessage struct {
 	Id      int64 `bson:"_id"`
 	Content string
-	Type    string
-	From    string
+	Type    int
+	From    int64
+	GroupId int64
 }
 
-//默认每隔15天新建一个collection
+
 type UserMessage struct {
 	Id      int64 `bson:"_id"`
-	From    string
-	To      string
+	From    int64
+	To      int64
 	Content string
-	Type    string
+	Type    int
+	IsRead bool
 }
+

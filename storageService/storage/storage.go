@@ -147,3 +147,15 @@ func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
 func (s *Storage) GetSessionValue(key string) (map[string]interface{}, error) {
 	return getSessionValue(s.redis, s.sessionPrefix+key)
 }
+
+func (s *Storage) CreateUserMessage(id int64, from int64, to int64, content string, msgType int) error {
+	return createUserMessage(s.db, id, from, to, content, msgType)
+}
+
+func (s *Storage) CreateGroupMessage(id int64, from int64, groupId int64, content string, msgType int) error {
+	return createGroupMessage(s.db, id, groupId, from, content, msgType)
+}
+
+func (s *Storage) MarkUserMessageRead(id int64) error {
+	return markUserMessageRead(s.db, id)
+}

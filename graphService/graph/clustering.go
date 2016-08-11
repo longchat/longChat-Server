@@ -1,11 +1,9 @@
 package graph
 
 import (
-	"fmt"
 	slog "log"
 
 	_ "github.com/go-cq/cq"
-	"github.com/jmoiron/sqlx"
 )
 
 type Relation struct {
@@ -24,15 +22,24 @@ var clusters []Cluster
 var oldClusters []Cluster
 var newClusters []Cluster
 
-func StartAnalysis(neo4jURL string) {
-	db, err := sqlx.Connect("neo4j-cypher", neo4jURL)
+func GetClusterByUserId(userid int64) (int, error) {
+	cypher := "match (p) where u.UserId={0} return p.GroupId"
+	rows, err := graphDb.Query(cypher, userid)
 	if err != nil {
-		slog.Fatalln("error connecting to neo4j:", err)
+		return 0, err
 	}
-	defer db.Close()
+	rows.Next()
+	var groupId int
+	err = rows.Scan(&groupId)
+	if err != nil {
+		return 0, err
+	}
+	return groupId, err
+}
 
+func Clustering() {
 	cypher := `match (p)-[l:Like]-(p2) return p.id,collect(p2.id) as nodes,collect(l.counts) as nodeScore order by  p.id asc`
-	rows, err := db.Query(cypher)
+	rows, err := graphDb.Query(cypher)
 	if err != nil {
 		slog.Fatalln("error querying movie:", err)
 	}
@@ -46,7 +53,7 @@ func StartAnalysis(neo4jURL string) {
 		var pscores []int
 		err := rows.Scan(&cid, &pids, &pscores)
 		if err != nil {
-			fmt.Println(err)
+			slog.Fatalf("scan error", err)
 		}
 		_, isok := cmap[cid]
 		if isok || cid > 1144 {
@@ -59,13 +66,9 @@ func StartAnalysis(neo4jURL string) {
 		}
 		var relations []Relation
 		for i := range pids {
-			if pids[i] > 1144 {
-				fmt.Println(pids[i])
-			}
 			relations = append(relations, Relation{id: pids[i] - baseId, score: pscores[i]})
 		}
 		oneCluster := Cluster{id: len(clusters), ParaRelation: relations}
-
 		clusters = append(clusters, oneCluster)
 	}
 	oldClusters = make([]Cluster, len(clusters))
@@ -74,8 +77,11 @@ func StartAnalysis(neo4jURL string) {
 	for idx < 6 {
 		idx++
 		for i := range clusters {
-			if clusters[i].FatherCluster != nil || clusters[i].IsClosed {
+			if clusters[i].FatherCluster != nil {
 				continue
+			}
+			if clusters[i].IsClosed {
+				put(&clusters[i])
 			}
 			if clusters[i].SubCluster == nil {
 				candidate := Relation{score: -1, id: -1}
@@ -119,18 +125,20 @@ func StartAnalysis(neo4jURL string) {
 	}
 
 	for i, data := range clusters {
-		fmt.Print(i, ":\n")
-		printCluster(&data)
-		fmt.Print("\n\n")
+		setCluster(i, &data)
 	}
 }
 
-func printCluster(c *Cluster) {
+var sum int
+
+func setCluster(i int, c *Cluster) {
 	if c.SubCluster == nil {
-		fmt.Print(" ", c.id)
+		graphDb.Query("match (p) where p.id={0} set p.GroupId={1}", c.id, i)
+		//fmt.Printf("%d ", c.id)
+		sum++
 	} else {
 		for _, data := range c.SubCluster {
-			printCluster(data)
+			setCluster(i, data)
 		}
 	}
 	return
@@ -140,9 +148,6 @@ func calculateParaWithCandicate(c *Cluster, candidate *Relation, candidate2 *Rel
 	paraRelation := make(map[int]Relation)
 	for j := range c.SubCluster {
 		sub := c.SubCluster[j]
-		if len(sub.ParaRelation) == 0 {
-			slog.Println("null para", sub.id)
-		}
 
 		for k := range sub.ParaRelation {
 			fId := oldClusters[sub.ParaRelation[k].id].FatherCluster.id
@@ -190,22 +195,29 @@ func calculatePara(c *Cluster) {
 	}
 }
 
+//append one cluster to another big cluster
 func join(father *Cluster, child *Cluster) {
 	father.SubCluster = append(father.SubCluster, child)
 	child.FatherCluster = father
 }
 
+//merge two clusters into one big cluster
 func merge(ca *Cluster, cb *Cluster) {
 	father := Cluster{
 		id:         len(newClusters),
 		SubCluster: []*Cluster{ca, cb},
 	}
 	newClusters = append(newClusters, father)
-	ca.FatherCluster = &father
-	cb.FatherCluster = &father
+	ca.FatherCluster = &newClusters[father.id]
+	cb.FatherCluster = &newClusters[father.id]
 }
 
 func put(c *Cluster) {
-	c.id = len(newClusters)
-	newClusters = append(newClusters, *c)
+	father := Cluster{
+		id:           len(newClusters),
+		SubCluster:   []*Cluster{c},
+		ParaRelation: c.ParaRelation,
+	}
+	newClusters = append(newClusters, father)
+	c.FatherCluster = &newClusters[father.id]
 }
