@@ -1,14 +1,37 @@
-# longChat
-基于websocket的聊天系统
+longChat
+======
+基于websocket的聊天系统  
 
-##Features
-1.扩展伸缩方便，树型架构决定了系统是低耦合的，节点可以随意热拔插
+Features
+======
+1.扩展伸缩方便，树型架构决定了系统是低耦合的，节点可以随意热拔插  
+2.高容错性，聊天集群上每一个节点运行的都是同一份代码、同一种数据结构，一台down了时可以使用任意一台顶替  
+3.基于社交网络的聚类(Clustering)，将联系频繁的用户划分到同一节点服务器，减少父节点服务器转发压力  
 
-2.高可用，所有节点上每一台服务器运行的都是同一份代码，一台down了时可以使用任意一台顶替
+关键服务器详解
+======
+### messageService
+消息的主体，维护着子节点和父节点的keepalive长连接，对于messageService而言子节点是messageService服务器还是用户客户端都是一视同仁的，它只负责转发;同时messageService还会连接到父节点messageService，将自己无法处理的消息发送给父节点处理  
 
-3.基于社交网络的聚类(Clustering)，将联系频繁的用户划分到同一节点服务器，减少根节点服务器压力
+### apiService
+负责用户登录注册、获取聊天群信息等基本的restful服务，同时负责获取用户cluster以分配messageService的地址
 
-##Architecture  
+### idService
+负责给其他服务配分全局唯一的id，id组成:1-13位为unix timestamp，14-17位为每个idService的自增计数器（步长为总idservice数，这样可以保证生成的id不重复），18-19为id类型Type
 
-![](http://o8up60qgx.bkt.clouddn.com/%E6%9E%84%E6%9E%B6.png)  
+### storageService
+负责持久化用户数据、聊天消息数据，也负责存取redis缓存
+
+### graphService
+根据用户聊天频率、聊天对象建立图，根据聚类算法离线计算出每一个用户所属的群(cluster)
+
+Architecture
+======
+![](http://h5.mkwhat.com/archi.png)  
+
+
+Todo
+======
+- [] 聊天集群监控Moniter，单个聊天节点down掉后选举替代节点,自动负载均衡  
+- [] 用户的未读消息、历史消息获取  
 
