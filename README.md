@@ -19,7 +19,7 @@ Features
 负责用户登录注册、获取聊天群信息等基本的restful服务，同时负责获取用户cluster以分配messageService的地址
 
 ### idService
-负责给其他服务配分全局唯一的id，id组成:1-13位为unix timestamp，14-17位为每个idService的自增计数器（步长为总idservice数，这样可以保证生成的id不重复），18-19为id类型Type
+负责给其他服务配分全局唯一19位纯数字id，id组成:1-13位为unix timestamp，14-17位为每个idService的自增计数器（步长为总idservice数，这样可以保证生成的id不重复），18-19为id类型Type
 
 ### storageService
 负责持久化用户数据、聊天消息数据，也负责存取redis缓存
