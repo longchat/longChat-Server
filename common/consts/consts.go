@@ -27,6 +27,7 @@ const (
 	IsLeafServer          = "service.message.isleaf"
 	ErrorLogPath          = "log.error.path"
 	AccessLogPath         = "log.access.path"
+	MoniterAddr           = "service.moniter.address"
 
 	TlsEnable = "security.tls.enable"
 
