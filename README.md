@@ -2,11 +2,13 @@ longChat
 ======
 基于websocket的聊天系统  
 
+
 Features
 ======
 1.扩展伸缩方便，树型架构决定了系统是低耦合的，节点可以随意热拔插  
 2.高容错性，聊天集群上每一个节点运行的都是同一份代码、同一种数据结构，一台down了时可以使用任意一台顶替  
 3.基于社交网络的聚类(Clustering)，将联系频繁的用户划分到同一节点服务器，减少父节点服务器转发压力  
+
 
 关键服务器详解
 ======
@@ -25,9 +27,10 @@ Features
 ### graphService
 根据用户聊天频率、聊天对象建立图，根据聚类算法离线计算出每一个用户所属的群(cluster)
 
+
 Architecture
 ======
-![](http://h5.mkwhat.com/archi.png)  
+![](./docs/pics/archi.png)  
 
 
 Todo
