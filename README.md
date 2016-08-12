@@ -10,7 +10,7 @@ Features
 3.基于社交网络的聚类(Clustering)，将联系频繁的用户划分到同一节点服务器，减少父节点服务器转发压力  
 
 
-关键服务器详解
+Key Services
 ======
 ### messageService
 消息的主体，维护着子节点和父节点的keepalive长连接，对于messageService而言子节点是messageService服务器还是用户客户端都是一视同仁的，它只负责转发;同时messageService还会连接到父节点messageService，将自己无法处理的消息发送给父节点处理  
@@ -38,3 +38,6 @@ Todo
 - [ ] 聊天集群监控Moniter，单个聊天节点down掉后选举替代节点,自动负载均衡  
 - [ ] 用户的未读消息、历史消息获取  
 
+Dependency
+======
+longChat-Server采用了redis和MongoDB、Neo4j分别做cache和持久化存储，需要安装这三者的驱动  
