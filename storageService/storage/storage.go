@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-xorm/core"
+	"github.com/go-xorm/xorm"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/storageService/storage/schema"
@@ -17,6 +19,7 @@ type Storage struct {
 	db    *mgo.Database
 	redis *redis.ClusterClient
 
+	mysqlDb       [][]*xorm.Engine
 	sessionPrefix string
 }
 
@@ -46,7 +49,72 @@ func (s *Storage) initRedis() error {
 	if err != nil {
 		return errors.New(consts.ErrGetConfigFailed(consts.SessionPrefix, err))
 	}
+
 	return nil
+}
+
+func (s *Storage) initMysql() error {
+	cluster1, err := config.GetConfigString("mysql.group.0.cluster.0")
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.SessionPrefix, err))
+	}
+	cluster2, err := config.GetConfigString("mysql.group.0.cluster.1")
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.SessionPrefix, err))
+	}
+	cluster3, err := config.GetConfigString("mysql.group.1.cluster.0")
+	if err != nil {
+		return errors.New(consts.ErrGetConfigFailed(consts.SessionPrefix, err))
+	}
+	s.mysqlDb = make([][]*xorm.Engine, 2)
+	db, err := loadMysqlDb(cluster1)
+	if err != nil {
+		return nil
+	}
+	s.mysqlDb[0] = append(s.mysqlDb[0], db)
+	db, err = loadMysqlDb(cluster2)
+	if err != nil {
+		return nil
+	}
+	s.mysqlDb[0] = append(s.mysqlDb[0], db)
+	db, err = loadMysqlDb(cluster3)
+	if err != nil {
+		return nil
+	}
+	s.mysqlDb[1] = append(s.mysqlDb[0], db)
+	return nil
+}
+
+func loadMysqlDb(addrs string) (*xorm.Engine, error) {
+	dbuser, err := config.GetConfigString("mysql.db.user")
+	if err != nil {
+		return nil, err
+	}
+	dbpasswd, err := config.GetConfigString("mysql.db.passwd")
+	if err != nil {
+		return nil, err
+	}
+	dbaddr, err := config.GetConfigString(addrs)
+	if err != nil {
+		return nil, err
+	}
+	dbname, err := config.GetConfigString("mysql.db.name")
+	if err != nil {
+		return nil, err
+	}
+	connstr := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", dbuser, dbpasswd, dbaddr, dbname)
+	db, err := xorm.NewEngine("mysql", connstr)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(50)
+	db.SetMapper(core.SameMapper{})
+	return db, nil
 }
 
 func (s *Storage) initMongo() error {
@@ -94,6 +162,10 @@ func NewStorage() (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = s.initMysql()
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -103,40 +175,99 @@ func (s *Storage) Close() {
 	}
 }
 
+func (s *Storage) getDb(groupId int64, id int64) *xorm.Engine {
+	hash := id % 1024
+	var engine *xorm.Engine
+	if hash < 512 {
+		engine = s.mysqlDb[0][0]
+	} else {
+		engine = s.mysqlDb[0][1]
+	}
+	return engine
+}
+
+type Slot struct {
+	db  *xorm.Engine
+	ids []int64
+}
+
+func (s *Storage) getDbsByIds(groupId int64, ids []int64) map[int]Slot {
+	engineMap := make(map[int]Slot)
+	for i := range ids {
+		hash := ids[i] % 1024
+		if hash < 512 {
+			slot, isok := engineMap[0]
+			if !isok {
+				slot.db = s.mysqlDb[groupId][0]
+			}
+			slot.ids = append(slot.ids, ids[i])
+			engineMap[0] = slot
+		} else {
+			slot, isok := engineMap[1]
+			if !isok {
+				slot.db = s.mysqlDb[groupId][1]
+			}
+			slot.ids = append(slot.ids, ids[i])
+			engineMap[1] = slot
+		}
+	}
+	return engineMap
+}
+
 func (s *Storage) AddUserGroup(userId int64, groupId int64) error {
-	return addUserGroup(s.db, groupId, userId)
+	return addUserGroup(s.mysqlDb[1][0], groupId, userId)
 }
 
 func (s *Storage) UpdateUserInfo(id int64, nickName string, avatar string, intro string) error {
-	return updateUserInfo(s.db, id, nickName, avatar, intro)
+	return updateUserInfo(s.getDb(0, id), id, nickName, avatar, intro)
 }
 
 func (s *Storage) CreateUser(id int64, userName string, password string, salt string, lastLoginIp string) error {
-	return createUser(s.db, id, userName, password, salt, lastLoginIp)
+	return createUser(s.getDb(0, id), id, userName, password, salt, lastLoginIp)
 }
 
 func (s *Storage) GetUserByUserName(userName string) (*schema.User, error) {
-	return getUserByUserName(s.db, userName)
+	for i := 0; i <= 1; i++ {
+		user, err := getUserByUserName(s.mysqlDb[0][i], userName)
+		if err != nil {
+			return nil, err
+		}
+		if user.Id > 0 {
+			return user, nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *Storage) GetUserById(id int64) (*schema.User, error) {
-	return getUserById(s.db, id)
+	return getUserById(s.getDb(0, id), id)
 }
 
-func (s *Storage) GetUsersById(ids []int64) ([]schema.User, error) {
-	return getUsersById(s.db, ids)
+func (s *Storage) GetGroupsByOrderId(id int64, limit int) ([]schema.Group, error) {
+	var groups []schema.Group
+	for i := 0; i <= 1; i++ {
+		gs, err := getGroupsByOrderIdx(s.mysqlDb[0][i], id, limit)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, gs...)
+	}
+	return groups, nil
 }
-
-func (s *Storage) AddGroupMember(groupId int64, userId int64) error {
-	return addGroupMember(s.db, groupId, userId)
+func (s *Storage) GetUsersByIds(ids []int64) ([]schema.User, error) {
+	dbs := s.getDbsByIds(0, ids)
+	var users []schema.User
+	for _, data := range dbs {
+		g, err := getUsersByIds(data.db, data.ids)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, g...)
+	}
+	return users, nil
 }
-
-func (s *Storage) GetGroupsByOrderIdx(orderIdx int64, limit int) ([]schema.Group, error) {
-	return getGroupsByOrderIdx(s.db, orderIdx, limit)
-}
-
 func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
-	return getGroupById(s.db, id)
+	return getGroupById(s.getDb(0, id), id)
 }
 
 func (s *Storage) GetSessionValue(key string) (map[string]interface{}, error) {

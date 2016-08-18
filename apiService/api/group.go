@@ -35,11 +35,7 @@ func (ga *GroupApi) joinGroup(c *iris.Context) {
 		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("uid"))
 		return
 	}
-	err = ga.store.AddGroupMember(gId, uId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
-		return
-	}
+
 	err = ga.store.AddUserGroup(uId, gId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
@@ -61,7 +57,7 @@ func (ga *GroupApi) getGroupDetail(c *iris.Context) {
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
 		return
 	}
-	users, err := ga.store.GetUsersById(group.Members)
+	users, err := ga.store.GetUsersByIds(group.Members)
 	rsp := dto.GetGroupDetailRsp{BaseRsp: *dto.SuccessRsp()}
 	rsp.Data.Group = dto.GroupDetail{
 		Id:        fmt.Sprintf("%d", group.Id),
@@ -94,7 +90,7 @@ func (ga *GroupApi) getGroupList(c *iris.Context) {
 	if err != nil {
 		limit = 15
 	}
-	groups, err := ga.store.GetGroupsByOrderIdx(orderIdx, limit)
+	groups, err := ga.store.GetGroupsByOrderId(orderIdx, limit)
 	if err != nil {
 		log.ERROR.Printf("GetGroupsByOrderIdx from storage failed!err:=%v\n", err)
 		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
