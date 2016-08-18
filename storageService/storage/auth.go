@@ -5,7 +5,7 @@ import (
 	"gopkg.in/redis.v4"
 )
 
-func getSessionValue(redisCli *redis.Client, key string) (map[string]interface{}, error) {
+func getSessionValue(redisCli *redis.ClusterClient, key string) (map[string]interface{}, error) {
 	b, err := redisCli.Get(key).Bytes()
 	if err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ type IdGenerator struct {
 
 	counters [100]int64
 	step     int64
+	max      int64
 }
 
 func (is *IdGenerator) Init(rpcEnabled bool) error {
@@ -49,6 +50,7 @@ func (is *IdGenerator) Init(rpcEnabled bool) error {
 		return errors.New(consts.ErrGetConfigFailed(consts.IdServiceStep, err))
 	}
 	is.step = step
+	is.max = 10000 - 10000%step
 	return nil
 }
 
@@ -73,5 +75,5 @@ func (is *IdGenerator) Generate(idType GenerateReq_IdType) (int64, error) {
 
 func (is *IdGenerator) generate(idType GenerateReq_IdType, idx *int64, step int64) int64 {
 	//共19位,前13位是时间戳，中间4位是计数器，后2位是类型Id
-	return (int64(time.Now().UnixNano())/1000000)*1000000 + (atomic.AddInt64(idx, is.step)%10000)*100 + int64(idType)
+	return (int64(time.Now().UnixNano())/1000000)*1000000 + (atomic.AddInt64(idx, is.step)%is.max)*100 + int64(idType)
 }

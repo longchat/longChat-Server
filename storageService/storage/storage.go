@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/longchat/longChat-Server/common/config"
@@ -14,33 +15,27 @@ import (
 
 type Storage struct {
 	db    *mgo.Database
-	redis *redis.Client
+	redis *redis.ClusterClient
 
 	sessionPrefix string
 }
 
 func (s *Storage) initRedis() error {
-	redisAddr, err := config.GetConfigString(consts.RedisAddress)
+	redisAddrs, err := config.GetConfigString(consts.RedisAddress)
 	if err != nil {
 		return errors.New(consts.ErrGetConfigFailed(consts.RedisAddress, err))
 	}
-	redisPsw, err := config.GetConfigString(consts.RedisPassword)
-	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.RedisPassword, err))
-	}
-	redisDb, err := config.GetConfigInt(consts.RedisDb)
-	if err != nil {
-		return errors.New(consts.ErrGetConfigFailed(consts.RedisDb, err))
-	}
-	s.redis = redis.NewClient(&redis.Options{
-		Addr:         redisAddr,
-		Password:     redisPsw, // no password set
-		DB:           redisDb,  // use default DB
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  10 * time.Second,
-		PoolSize:     128,
+	addrslice := strings.Split(redisAddrs, ",")
+	s.redis = redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:          addrslice,
+		MaxRedirects:   8,
+		ReadOnly:       true,
+		RouteByLatency: true,
+		DialTimeout:    5 * time.Second,
+		ReadTimeout:    5 * time.Second,
+		WriteTimeout:   5 * time.Second,
+		IdleTimeout:    10 * time.Second,
+		PoolSize:       32,
 	})
 	_, err = s.redis.Ping().Result()
 	if err != nil {
