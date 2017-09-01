@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kataras/iris/core/memstore"
+
 	"github.com/go-xorm/core"
 	"github.com/go-xorm/xorm"
 	"github.com/longchat/longChat-Server/common/config"
@@ -270,7 +272,7 @@ func (s *Storage) GetGroupById(id int64) (*schema.Group, error) {
 	return getGroupById(s.getDb(0, id), id)
 }
 
-func (s *Storage) GetSessionValue(key string) (map[string]interface{}, error) {
+func (s *Storage) GetSessionValue(key string) (memstore.Store, error) {
 	return getSessionValue(s.redis, s.sessionPrefix+key)
 }
 

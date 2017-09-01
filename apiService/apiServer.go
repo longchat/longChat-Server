@@ -58,8 +58,8 @@ func main() {
 		slog.Fatalf("init graph service failed!", err)
 	}
 	defer graph.FinDb()
-	framework := iris.New()
-	api.Iint(framework, &idGen, store)
-	framework.Listen(addr)
 
+	framework := iris.New()
+	api.Init(framework, &idGen, store)
+	framework.Run(iris.Addr(addr))
 }
