@@ -124,19 +124,19 @@ func (s *Server) serveLeaf(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("invalid session cookie"))
 		return
 	}
-	rmap, err := store.GetSessionValue(sId)
+	svalues, err := store.GetSessionValue(sId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 		return
 	}
-	uid, isok := rmap["Id"]
-	if !isok {
+
+	userId, err := svalues.GetInt64["Id"]
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("invalid session"))
 		return
 	}
-	userId := uid.(int64)
 	user, err := store.GetUserById(userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

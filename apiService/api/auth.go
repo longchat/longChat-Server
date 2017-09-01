@@ -4,10 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/kataras/iris"
+	"github.com/kataras/iris/sessions"
+
 	"github.com/longchat/longChat-Server/apiService/api/dto"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
@@ -20,9 +21,9 @@ type AuthApi struct {
 	store *storage.Storage
 }
 
-func (au *AuthApi) RegisterRoute(framework *iris.Framework) {
-	framework.Post("/login", au.login)
-	framework.Post("/logout", au.login)
+func (au *AuthApi) RegisterRoute(framework *iris.Application, sess *sessions.Sessions) {
+	framework.Post("/login", au.login(sess))
+	framework.Post("/logout", au.logout(sess))
 }
 
 func getHashedPassword(raw string, salt string) string {
@@ -39,36 +40,44 @@ func newToken(id int64) (string, error) {
 	return util.NewToken(id, privateToken, time.Hour*12), nil
 }
 
-func (au *AuthApi) login(c *iris.Context) {
-	var loginReq dto.LoginReq
-	err := c.ReadJSON(&loginReq)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.PostDataErrRsp("LoginReq"))
-		return
-	}
-	user, err := au.store.GetUserByUserName(loginReq.UserName)
-	if err != nil {
-		log.ERROR.Printf("GetUserByUserName(%s) from storage failed!err:=%v\n", loginReq.UserName, err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
-		return
-	}
-	if getHashedPassword(loginReq.Password, user.Salt) != user.Password {
-		c.JSON(http.StatusUnauthorized, dto.PasswordNotMatchErrRsp())
-		return
-	}
-	c.Session().Set("Id", user.Id)
+func (au *AuthApi) login(sess *sessions.Sessions) func(iris.Context) {
+	return func(c iris.Context) {
+		var loginReq dto.LoginReq
+		err := c.ReadJSON(&loginReq)
+		if err != nil {
+			c.StatusCode(iris.StatusBadRequest)
+			c.JSON(dto.PostDataErrRsp("LoginReq"))
+			return
+		}
+		user, err := au.store.GetUserByUserName(loginReq.UserName)
+		if err != nil {
+			log.ERROR.Printf("GetUserByUserName(%s) from storage failed!err:=%v\n", loginReq.UserName, err)
+			c.StatusCode(iris.StatusInternalServerError)
+			c.JSON(dto.InternalErrRsp())
+			return
+		}
+		if getHashedPassword(loginReq.Password, user.Salt) != user.Password {
+			c.StatusCode(iris.StatusUnauthorized)
+			c.JSON(dto.PasswordNotMatchErrRsp())
+			return
+		}
+		session := sess.Start(c)
+		session.Set("Id", user.Id)
 
-	var userDto dto.UserInfo
-	userDto.Id = fmt.Sprintf("%d", user.Id)
-	userDto.Avatar = user.Avatar
-	userDto.Introduce = user.Introduce
-	userDto.NickName = user.NickName
+		var userDto dto.UserInfo
+		userDto.Id = fmt.Sprintf("%d", user.Id)
+		userDto.Avatar = user.Avatar
+		userDto.Introduce = user.Introduce
+		userDto.NickName = user.NickName
 
-	var rsp dto.LoginRsp
-	rsp.Data.User = userDto
-	c.JSON(http.StatusOK, &rsp)
+		var rsp dto.LoginRsp
+		rsp.Data.User = userDto
+		c.JSON(&rsp)
+	}
 }
 
-func (au *AuthApi) logout(c *iris.Context) {
+func (au *AuthApi) logout(sess *sessions.Sessions) func(iris.Context) {
+	return func(c iris.Context) {
 
+	}
 }
