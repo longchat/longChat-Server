@@ -4,7 +4,7 @@ import (
 	"flag"
 	slog "log"
 
-	"github.com/kataras/iris"
+	"github.com/kataras/iris/v12"
 	"github.com/longchat/longChat-Server/apiService/api"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
@@ -55,11 +55,10 @@ func main() {
 	}
 	err = graph.NewDb(neoUrl)
 	if err != nil {
-		slog.Fatalf("init graph service failed!", err)
+		slog.Fatalf("init graph service failed: %v", err)
 	}
 	defer graph.FinDb()
 	framework := iris.New()
 	api.Iint(framework, &idGen, store)
-	framework.Listen(addr)
-
+	framework.Run(iris.Addr(addr))
 }

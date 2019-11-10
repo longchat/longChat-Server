@@ -3,7 +3,7 @@ package storage
 import (
 	"time"
 
-	"github.com/go-xorm/xorm"
+	"xorm.io/xorm"
 	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/storageService/storage/schema"
 )
@@ -42,7 +42,7 @@ func getUserById(db *xorm.Engine, id int64) (*schema.User, error) {
 	var user schema.User
 	_, err := db.Where("Id=?", id).Get(&user)
 	if err != nil {
-		log.ERROR.Printf("findone user(%s) from db failed!err:=%v\n", id, err)
+		log.ERROR.Printf("findone user(%d) from db failed!err:=%v\n", id, err)
 		return nil, err
 	}
 	return &user, nil

@@ -2,9 +2,8 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 
-	"github.com/kataras/iris"
+	"github.com/kataras/iris/v12"
 	"github.com/longchat/longChat-Server/apiService/api/dto"
 	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/idService/generator"
@@ -16,7 +15,7 @@ type GroupApi struct {
 	store *storage.Storage
 }
 
-func (ga *GroupApi) RegisterRoute(framework *iris.Framework) {
+func (ga *GroupApi) RegisterRoute(framework *iris.Application) {
 	users := framework.Party("/groups")
 	users.Get("", ga.getGroupList)
 	users.Get("/:id", ga.getGroupDetail)
@@ -24,37 +23,42 @@ func (ga *GroupApi) RegisterRoute(framework *iris.Framework) {
 
 }
 
-func (ga *GroupApi) joinGroup(c *iris.Context) {
-	gId, err := c.ParamInt64("id")
+func (ga *GroupApi) joinGroup(c iris.Context) {
+	gId, err := c.Params().GetInt64("id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("id"))
 		return
 	}
-	uId, err := c.ParamInt64("uid")
+	uId, err := c.Params().GetInt64("uid")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("uid"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("uid"))
 		return
 	}
 
 	err = ga.store.AddUserGroup(uId, gId)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 	rsp := dto.SuccessRsp()
-	c.JSON(200, &rsp)
+	c.JSON(&rsp)
 }
 
-func (ga *GroupApi) getGroupDetail(c *iris.Context) {
-	gId, err := c.ParamInt64("id")
+func (ga *GroupApi) getGroupDetail(c iris.Context) {
+	gId, err := c.Params().GetInt64("id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("id"))
 		return
 	}
 	group, err := ga.store.GetGroupById(gId)
 	if err != nil {
 		log.ERROR.Printf("getGroupById(%d) from storage failed!err:=%v\n", gId, err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 	users, err := ga.store.GetUsersByIds(group.Members)
@@ -78,10 +82,10 @@ func (ga *GroupApi) getGroupDetail(c *iris.Context) {
 		usersDto = append(usersDto, userDto)
 	}
 	rsp.Data.Group.Members = usersDto
-	c.JSON(200, &rsp)
+	c.JSON(&rsp)
 }
 
-func (ga *GroupApi) getGroupList(c *iris.Context) {
+func (ga *GroupApi) getGroupList(c iris.Context) {
 	orderIdx, err := c.URLParamInt64("orderidx")
 	if err != nil {
 		orderIdx = 0
@@ -93,7 +97,8 @@ func (ga *GroupApi) getGroupList(c *iris.Context) {
 	groups, err := ga.store.GetGroupsByOrderId(orderIdx, limit)
 	if err != nil {
 		log.ERROR.Printf("GetGroupsByOrderIdx from storage failed!err:=%v\n", err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 	groupsDto := make([]dto.Group, limit)
@@ -112,5 +117,5 @@ func (ga *GroupApi) getGroupList(c *iris.Context) {
 		BaseRsp: *dto.SuccessRsp(),
 	}
 	rsp.Data.Groups = groupsDto[:len(groups)]
-	c.JSON(200, &rsp)
+	c.JSON(&rsp)
 }
