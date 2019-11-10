@@ -53,7 +53,7 @@ func Clustering() {
 		var pscores []int
 		err := rows.Scan(&cid, &pids, &pscores)
 		if err != nil {
-			slog.Fatalf("scan error", err)
+			slog.Fatalf("scan error: %v", err)
 		}
 		_, isok := cmap[cid]
 		if isok || cid > 1144 {

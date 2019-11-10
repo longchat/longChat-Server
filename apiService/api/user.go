@@ -2,9 +2,8 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 
-	"github.com/kataras/iris"
+	"github.com/kataras/iris/v12"
 	"github.com/longchat/longChat-Server/apiService/api/dto"
 	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/common/util"
@@ -19,7 +18,7 @@ type UserApi struct {
 	serverAddrs []string
 }
 
-func (ua *UserApi) RegisterRoute(framework *iris.Framework) {
+func (ua *UserApi) RegisterRoute(framework *iris.Application) {
 	users := framework.Party("/users")
 	users.Post("", ua.createUser)
 	users.Put("/:id", ua.updateInfo)
@@ -27,35 +26,39 @@ func (ua *UserApi) RegisterRoute(framework *iris.Framework) {
 	users.Get("/:id/serveraddr", ua.getserverAddr)
 }
 
-func (ua *UserApi) getserverAddr(c *iris.Context) {
-	uid, err := c.ParamInt64("id")
+func (ua *UserApi) getserverAddr(c iris.Context) {
+	uid, err := c.Params().GetInt64("id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("id"))
 		return
 	}
 	clusterId, err := graph.GetClusterByUserId(uid)
 	if err != nil {
-		log.ERROR.Printf("get user  cluster id from graph failed!err:=%v\n", uid, err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		log.ERROR.Printf("get user  cluster id(%d) from graph failed!err:=%v\n", uid, err)
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 
 	id := clusterId % len(ua.serverAddrs)
 	userRsp := dto.GetUserServerAddrRsp{BaseRsp: *dto.SuccessRsp()}
 	userRsp.Data.Addr = ua.serverAddrs[id]
-	c.JSON(http.StatusOK, &userRsp)
+	c.JSON(&userRsp)
 }
 
-func (ua *UserApi) getInfo(c *iris.Context) {
-	uid, err := c.ParamInt64("id")
+func (ua *UserApi) getInfo(c iris.Context) {
+	uid, err := c.Params().GetInt64("id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("id"))
 		return
 	}
 	user, err := ua.store.GetUserById(uid)
 	if err != nil {
 		log.ERROR.Printf("get usser(%d) from storage failed!err:=%v\n", uid, err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 	userRsp := dto.GetUserInfoRsp{BaseRsp: *dto.SuccessRsp()}
@@ -65,40 +68,45 @@ func (ua *UserApi) getInfo(c *iris.Context) {
 		Avatar:    user.Avatar,
 		Introduce: user.Introduce,
 	}
-	c.JSON(http.StatusOK, &userRsp)
+	c.JSON(&userRsp)
 }
 
-func (ua *UserApi) updateInfo(c *iris.Context) {
+func (ua *UserApi) updateInfo(c iris.Context) {
 	var infoReq dto.UpdateInfoReq
 	err := c.ReadJSON(&infoReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.PostDataErrRsp("UpdateInfoReq"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.PostDataErrRsp("UpdateInfoReq"))
 		return
 	}
-	uid, err := c.ParamInt64("id")
+	uid, err := c.Params().GetInt64("id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ParameterErrRsp("id"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.ParameterErrRsp("id"))
 		return
 	}
 	err = ua.store.UpdateUserInfo(uid, infoReq.NickName, infoReq.Avatar, infoReq.Introduce)
 	if err != nil {
 		log.ERROR.Printf("UpdateUserInfo from storage failed!err:=%v\n", err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
-	c.JSON(http.StatusOK, dto.SuccessRsp())
+	c.JSON(dto.SuccessRsp())
 }
 
-func (ua *UserApi) createUser(c *iris.Context) {
+func (ua *UserApi) createUser(c iris.Context) {
 	var userReq dto.CreateUserReq
 	err := c.ReadJSON(&userReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.PostDataErrRsp("CreateUserReq"))
+		c.StatusCode(iris.StatusBadRequest)
+		c.JSON(dto.PostDataErrRsp("CreateUserReq"))
 		return
 	}
 	id, err := ua.idGen.Generate(generator.GenerateReq_User)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
 	salt := util.RandomString(8)
@@ -106,8 +114,9 @@ func (ua *UserApi) createUser(c *iris.Context) {
 	err = ua.store.CreateUser(id, userReq.UserName, hashedPassword, salt, c.RemoteAddr())
 	if err != nil {
 		log.ERROR.Printf("CreateUser from storage failed!err:=%v\n", err)
-		c.JSON(http.StatusInternalServerError, dto.InternalErrRsp())
+		c.StatusCode(iris.StatusInternalServerError)
+		c.JSON(dto.InternalErrRsp())
 		return
 	}
-	c.JSON(http.StatusOK, dto.SuccessRsp())
+	c.JSON(dto.SuccessRsp())
 }

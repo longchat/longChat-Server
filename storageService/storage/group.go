@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/go-xorm/xorm"
+	"xorm.io/xorm"
 	"github.com/longchat/longChat-Server/common/log"
 	"github.com/longchat/longChat-Server/storageService/storage/schema"
 )

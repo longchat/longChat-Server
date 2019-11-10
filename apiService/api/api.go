@@ -5,18 +5,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iris-contrib/sessiondb/redis"
-	"github.com/iris-contrib/sessiondb/redis/service"
-	"github.com/kataras/iris"
-	iconfig "github.com/kataras/iris/config"
+	"github.com/kataras/iris/v12"
+	"github.com/kataras/iris/v12/sessions"
+	"github.com/kataras/iris/v12/sessions/sessiondb/redis"
 	"github.com/longchat/longChat-Server/common/config"
 	"github.com/longchat/longChat-Server/common/consts"
 	"github.com/longchat/longChat-Server/idService/generator"
 	"github.com/longchat/longChat-Server/storageService/storage"
 )
 
-func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storage.Storage) {
-	framework.Config.Gzip = true
+func Iint(framework *iris.Application, idGen *generator.IdGenerator, store *storage.Storage) {
+	framework.Use(iris.Gzip)
 
 	redisAddr, err := config.GetConfigString(consts.RedisAddress)
 	if err != nil {
@@ -34,22 +33,25 @@ func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storag
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.SessionCookieName, err))
 	}
-	framework.Config.Sessions = iconfig.Sessions{
-		Cookie:     cookie,
-		GcDuration: time.Duration(2) * time.Hour,
-	}
 
-	db := redis.New(service.Config{Network: service.DefaultRedisNetwork,
-		Addr:          redisAddr,
-		Password:      redisPsw,
-		Database:      "0",
-		MaxIdle:       4,
-		MaxActive:     4,
-		IdleTimeout:   service.DefaultRedisIdleTimeout,
-		Prefix:        redisPrefix,
-		MaxAgeSeconds: service.DefaultRedisMaxAgeSeconds}) // optionally configure the bridge between your redis server
+	db := redis.New(redis.Config{
+		Network:   "tcp",
+		Addr:      redisAddr,
+		Timeout:   time.Duration(30) * time.Second,
+		MaxActive: 4,
+		Password:  redisPsw,
+		Database:  "0",
+		Prefix:    redisPrefix,
+		Delim:     "-",
+		Driver:    redis.Redigo(), // redis.Radix() can be used instead.
+	})
 
-	framework.UseSessionDB(db)
+	sessManager := sessions.New(sessions.Config{
+		Cookie:  cookie,
+		Expires: 2 * time.Hour,
+	})
+	sessManager.UseDatabase(db)
+	framework.Use(sessManager.Handler())
 
 	addrStr, err := config.GetConfigString(consts.LeafMsgServiceAddress)
 	if err != nil {
@@ -67,5 +69,5 @@ func Iint(framework *iris.Framework, idGen *generator.IdGenerator, store *storag
 	if err != nil {
 		log.Fatalf(consts.ErrGetConfigFailed(consts.ApiServiceAddress, err))
 	}
-	framework.Static("/static", staicPath, 1)
+	framework.HandleDir("/static", staicPath)
 }

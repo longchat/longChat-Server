@@ -23,7 +23,7 @@ func (s *generatorServer) Generate(ctx context.Context, in *generator.GenerateRe
 }
 
 func main() {
-	config.InitConfig()
+	config.InitConfig(nil, nil)
 
 	server := generatorServer{}
 	server.idGenerator = &generator.IdGenerator{}
